@@ -1,26 +1,239 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   Attendance register design system — Tailwind v4 (tokens live here, there is
+   no tailwind.config.js in v4).
+
+   Palette, typefaces and the register metaphor carry over from the vanilla
+   web/ build; see web/DESIGN.md. The chart layer is new and was DERIVED WITH
+   THE VALIDATOR, not by eye: the brand tokens fail as chart colour (ink sits
+   outside the lightness band, ash↔verdant collapse under protanopia), so chart
+   steps are separate values drawn from the same hue families.
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ---- brand surfaces & ink (light) ---- */
+  --paper:   #F4F5F0;
+  --card:    #FCFCF9;
+  --rule:    #D9DDD3;
+  --ink:     #16304F;
+  --oxide:   #9A3B2E;
+  --amber:   #A8731A;
+  --ash:     #6E7468;
+  --verdant: #2E6B4F;
+  --focus:   #16304F;
+
+  --card-hover: #FFFFFF;
+  --tint:       rgb(22 48 79 / 0.035);
+  --tint-hard:  rgb(22 48 79 / 0.07);
+
+  /* ---- chart layer: VALIDATED, do not hand-edit ----
+     node scripts/validate_palette.js "#3D6DA8,#B33A2B,#3E9970" \
+       --mode light --surface "#FCFCF9" --pairs all   ->  all 5 checks PASS
+     Three slots is deliberate: department comparison is 3 series. A 4th gold
+     slot collapsed into the oxide under deuteranopia; the guidance is to cut
+     series rather than invent hues. */
+  --series-1: #3D6DA8;
+  --series-2: #B33A2B;
+  --series-3: #3E9970;
+
+  /* Sequential ramp (magnitude — the weekday heatmap). One hue, light→dark. */
+  --seq-0: #EEF2F7;
+  --seq-1: #D3DFEC;
+  --seq-2: #A8C0DC;
+  --seq-3: #7C9FC9;
+  --seq-4: #5180B5;
+  --seq-5: #3D6DA8;
+
+  /* Status is RESERVED — never reused as "series 4", and always paired with a
+     letterform (P/L/A/E) so meaning never rests on colour alone. */
+  --status-present: #2E6B4F;
+  --status-late:    #A8731A;
+  --status-absent:  #9A3B2E;
+  --status-excused: #6E7468;
+
+  --shadow-sm: 0 1px 0 rgb(22 48 79 / 0.05);
+  --shadow-md: 0 1px 0 rgb(22 48 79 / 0.06), 0 8px 24px -18px rgb(22 48 79 / 0.5);
+  --shadow-lg: 0 1px 0 rgb(22 48 79 / 0.07), 0 14px 34px -20px rgb(22 48 79 / 0.55);
+
+  --line-h: 30px;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Dark is SELECTED, not flipped: its lightness band is L 0.48–0.67 versus
+   0.43–0.77 for light, so chart steps are mid-tones, not pale pastels.
+     node scripts/validate_palette.js "#5289C4,#D45C3E,#3FA97E" \
+       --mode dark --surface "#18202A" --pairs all   ->  all 5 checks PASS */
+
+:root[data-theme="dark"] {
+  --paper:   #11161D;
+  --card:    #18202A;
+  --rule:    #2B3542;
+  --ink:     #E6EBF2;
+  --oxide:   #E4785F;
+  --amber:   #E2A945;
+  --ash:     #93A1B2;
+  --verdant: #5DBF92;
+  --focus:   #9FC2E8;
+
+  --card-hover: #1D2733;
+  --tint:       rgb(230 235 242 / 0.045);
+  --tint-hard:  rgb(230 235 242 / 0.09);
+
+  --series-1: #5289C4;
+  --series-2: #D45C3E;
+  --series-3: #3FA97E;
+
+  --seq-0: #1A222C;
+  --seq-1: #22303F;
+  --seq-2: #2C4358;
+  --seq-3: #375875;
+  --seq-4: #446E96;
+  --seq-5: #5289C4;
+
+  --status-present: #5DBF92;
+  --status-late:    #E2A945;
+  --status-absent:  #E4785F;
+  --status-excused: #93A1B2;
+
+  --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 1px 0 rgb(0 0 0 / 0.35), 0 8px 24px -18px rgb(0 0 0 / 0.9);
+  --shadow-lg: 0 1px 0 rgb(0 0 0 / 0.4),  0 14px 34px -20px rgb(0 0 0 / 0.95);
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --paper: #11161D; --card: #18202A; --rule: #2B3542; --ink: #E6EBF2;
+    --oxide: #E4785F; --amber: #E2A945; --ash: #93A1B2; --verdant: #5DBF92;
+    --focus: #9FC2E8; --card-hover: #1D2733;
+    --tint: rgb(230 235 242 / 0.045); --tint-hard: rgb(230 235 242 / 0.09);
+    --series-1: #5289C4; --series-2: #D45C3E; --series-3: #3FA97E;
+    --seq-0: #1A222C; --seq-1: #22303F; --seq-2: #2C4358;
+    --seq-3: #375875; --seq-4: #446E96; --seq-5: #5289C4;
+    --status-present: #5DBF92; --status-late: #E2A945;
+    --status-absent: #E4785F; --status-excused: #93A1B2;
+    --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 1px 0 rgb(0 0 0 / 0.35), 0 8px 24px -18px rgb(0 0 0 / 0.9);
+    --shadow-lg: 0 1px 0 rgb(0 0 0 / 0.4),  0 14px 34px -20px rgb(0 0 0 / 0.95);
+    color-scheme: dark;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Expose tokens to Tailwind as utilities: bg-card, text-ink, border-rule, … */
+@theme inline {
+  --color-paper:   var(--paper);
+  --color-card:    var(--card);
+  --color-rule:    var(--rule);
+  --color-ink:     var(--ink);
+  --color-oxide:   var(--oxide);
+  --color-amber:   var(--amber);
+  --color-ash:     var(--ash);
+  --color-verdant: var(--verdant);
+  --color-tint:    var(--tint);
+
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+
+  /* next/font injects the hashed family into --font-*-loaded (see app/layout.tsx); the named
+     fallbacks keep the design intact if the font request fails. */
+  --font-label: var(--font-label-loaded), "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:  var(--font-sans-loaded), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:  var(--font-mono-loaded), "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-card: var(--shadow-md);
+  --shadow-lift: var(--shadow-lg);
 }
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 240ms cubic-bezier(0.22, 0.8, 0.3, 1),
+              color 240ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+/* Paper grain — fixed, non-interactive, painted once, never repaints on scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] body::before { opacity: 0.28; }
+
+/* ---------------------------------------------------------------- typography */
+
+/* No `display` here on purpose: forcing block breaks <th>, which must stay table-cell.
+   Callers that need a block add Tailwind's `block`. */
+.label {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ash);
+}
+.display {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* The signature element: ruled register paper. */
+.ruled {
+  background-image: repeating-linear-gradient(
+    to bottom, transparent, transparent calc(var(--line-h) - 1px),
+    var(--rule) var(--line-h));
+}
+
+/* ------------------------------------------------------------------- focus */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------------------- motion */
+@keyframes row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes stamp-in {
+  0%   { transform: rotate(-14deg) scale(2.4); opacity: 0; }
+  60%  { transform: rotate(-4deg) scale(0.94); opacity: 1; }
+  100% { transform: rotate(-4deg) scale(1); }
+}
+.animate-row-in { animation: row-in 240ms cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+.animate-stamp  { animation: stamp-in 420ms cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Touch: every control clears 44px. */
+@media (hover: none) {
+  button, [role="button"], a.btn, input, select { min-height: 44px; }
+}
+
+/* Recharts inherits our tokens instead of its own defaults. */
+.recharts-cartesian-axis-tick text {
+  fill: var(--ash);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.recharts-cartesian-grid line { stroke: var(--rule); }
+.recharts-tooltip-wrapper { outline: none; }

@@ -135,6 +135,20 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Occlusion-Robust Attendance", version="0.1.0", lifespan=lifespan)
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Defensive headers on every API response (the browser normally reaches the API only via
+    the web app's proxy, but the API must be safe to expose on its own as well)."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if request.url.path.startswith("/api/") and "cache-control" not in response.headers:
+        # Attendance data is personal and changes constantly: never cache it anywhere.
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 # ------------------------------------------------------------------ helpers
 
 def _user_out(u: User) -> UserOut:
@@ -1168,6 +1182,16 @@ def system_status(db: Session) -> dict:
     clock = clock_warning()
     if clock:
         warnings.append(f"CLOCK: {clock}")
+    from app.mailer import smtp_configured
+    import os as _os
+
+    if not smtp_configured():
+        warnings.append(
+            "EMAIL NOT DELIVERED — SMTP is not configured, so OTP codes, approvals and alerts "
+            "are written to var/outbox instead of being sent. Set SMTP_HOST and related "
+            "variables." + (" This is a PRODUCTION deployment." if _os.environ.get(
+                "ATTENDANCE_ENV", "").lower() == "production" else "")
+        )
     warnings.append(
         "THRESHOLDS UNVALIDATED — match/review/dup thresholds are the spec's placeholder values, "
         "not values derived from a ROC curve on enrolled faces. Run tools/roc.py."

@@ -1024,7 +1024,14 @@ def academic_options(db: Session = Depends(get_db)):
     sections.sort(key=lambda x: x["label"])
     max_years = dict(db.execute(select(Program.department_id, func.max(Program.duration_years))
                                 .group_by(Program.department_id)).all())
+    from app import settings_service
+    from app.runtime import cfg
+
+    s_all = settings_service.all_settings(db, cfg)
     return {
+        "org_name": s_all["org_name"],
+        "retention": {"review_days": s_all["review_retention_days"],
+                      "thumbnail_days": s_all["thumbnail_retention_days"]},
         "departments": [{"id": d.id, "code": d.code, "name": d.name,
                          "years": int(max_years.get(d.id) or 4)}
                         for d in db.scalars(select(Department).order_by(Department.code))],

@@ -167,7 +167,8 @@ def can_miss(present: int, counted: int, remaining: int, threshold: float = 75.0
     can_attend = present + remaining
     slack = can_attend - need_present
     if total <= 0:
-        return {"can_miss": 0, "at_risk": False, "reachable": True, "projected_pct": 0.0}
+        return {"can_miss": 0, "at_risk": False, "reachable": True, "current_pct": None,
+                "projected_pct": 0.0, "remaining": remaining}
 
     import math
     # Capped at `remaining`: the slack can exceed the number of classes that actually exist
@@ -175,12 +176,13 @@ def can_miss(present: int, counted: int, remaining: int, threshold: float = 75.0
     # 10 remain is worse than useless -- it is wrong in the direction that costs attendance.
     misses = min(remaining, max(0, math.floor(slack + 1e-9)))
     reachable = can_attend + 1e-9 >= need_present
-    current = 100.0 * present / counted if counted else 0.0
+    # No class held yet: there is no percentage, and a new student is not "at risk" of anything.
+    current = 100.0 * present / counted if counted else None
     return {
         "can_miss": misses if reachable else 0,
         "reachable": reachable,
-        "at_risk": current < threshold,
-        "current_pct": round(current, 1),
+        "at_risk": current is not None and current < threshold,
+        "current_pct": round(current, 1) if current is not None else None,
         "projected_pct": round(100.0 * can_attend / total, 1),
         "remaining": remaining,
     }

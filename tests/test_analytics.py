@@ -58,6 +58,14 @@ def test_can_miss_handles_an_empty_term():
     r = can_miss(present=0, counted=0, remaining=0, threshold=75.0)
     assert r["can_miss"] == 0
     assert r["projected_pct"] == 0.0
+    assert r["current_pct"] is None and r["remaining"] == 0
+
+
+def test_can_miss_before_the_first_class_has_no_percentage_and_no_risk():
+    r = can_miss(present=0, counted=0, remaining=20, threshold=75.0)
+    assert r["current_pct"] is None
+    assert r["at_risk"] is False
+    assert r["can_miss"] == 5 and r["remaining"] == 20
 
 
 def test_can_miss_exact_boundary_is_not_off_by_one():

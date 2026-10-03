@@ -13,6 +13,8 @@ type Projection = {
   current_pct: number;
   projected_pct: number;
   remaining: number;
+  /** Consecutive classes to attend to reach the minimum; 0 when already there. */
+  classes_needed?: number;
 };
 
 type Subject = {

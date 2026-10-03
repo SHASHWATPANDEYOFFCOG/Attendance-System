@@ -6,7 +6,7 @@
  */
 import { redirect } from "next/navigation";
 
-import { getMe, isStaffRole } from "@/lib/api";
+import { apiGet, getMe, isStaffRole } from "@/lib/api";
 import { homeFor } from "@/lib/session";
 import { staffNav } from "@/lib/nav";
 import { AppShell } from "@/components/shell";
@@ -18,8 +18,10 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   if (!me) redirect("/login");
   if (!isStaffRole(me.role)) redirect(homeFor(me.role));
 
+  const approvals = await apiGet<{ total: number }>("/api/approvals/summary").catch(() => null);
+
   return (
-    <AppShell me={me} groups={staffNav(me.role)} portal="Authority portal">
+    <AppShell me={me} groups={staffNav(me.role, { approvals: approvals?.total })} portal="Authority portal">
       {children}
     </AppShell>
   );

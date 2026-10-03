@@ -85,6 +85,30 @@ export const api = {
     send<T>(path, { method, body: form }),
 };
 
+/** Unauthenticated calls (sign-up, verification, password reset) through /api/public. */
+async function sendPublic<T>(path: string, init: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/public/${path.replace(/^\/+/, "")}`, { ...init, cache: "no-store" });
+  } catch {
+    throw new ApiFailure(0, "No connection. Check your network and try again.");
+  }
+  if (!res.ok) throw await failure(res);
+  return res.json() as Promise<T>;
+}
+
+export const publicApi = {
+  get: <T = unknown>(path: string) => sendPublic<T>(path, { method: "GET" }),
+  post: <T = unknown>(path: string, body: unknown) =>
+    sendPublic<T>(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  upload: <T = unknown>(path: string, form: FormData) =>
+    sendPublic<T>(path, { method: "POST", body: form }),
+};
+
 /** Save a Blob as a download (exports). */
 export function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

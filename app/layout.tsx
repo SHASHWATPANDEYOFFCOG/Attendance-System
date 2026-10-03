@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
 import "./globals.css";
+import { UiProvider } from "@/components/toast";
 
 /* A deliberate pairing, not Inter for everything:
      Barlow Condensed — condensed grotesque; uppercase letterspaced labels and headings
@@ -27,7 +28,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Attendance Register",
+  title: { default: "Attendance Register", template: "%s · Attendance Register" },
   description: "Occlusion-robust attendance for scheduled sessions",
 };
 
@@ -56,7 +57,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <UiProvider>{children}</UiProvider>
+      </body>
     </html>
   );
 }

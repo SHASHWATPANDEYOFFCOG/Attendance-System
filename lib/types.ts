@@ -14,6 +14,7 @@ export const AttendanceStatus = z.enum([
   "left_early",
   "on_duty",
   "excused",
+  "on_leave",
   "needs_review",
 ]);
 export type AttendanceStatus = z.infer<typeof AttendanceStatus>;

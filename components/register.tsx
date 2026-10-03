@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Mark, Pill } from "@/components/ui";
+import { useUi } from "@/components/toast";
 
 type Row = {
   user_id: number;
@@ -56,6 +57,7 @@ const KEYS: Record<string, string> = {
 const draftKey = (sessionId: number) => `att_draft_${sessionId}`;
 
 export function Register({ initial }: { initial: RosterPayload }) {
+  const { askReason } = useUi();
   const sessionId = initial.session.id;
   const [marks, setMarks] = useState<Record<number, string>>(() => {
     const base: Record<number, string> = {};
@@ -164,11 +166,34 @@ export function Register({ initial }: { initial: RosterPayload }) {
     }
 
     try {
-      const res = await fetch(`/api/backend/api/attendance/sessions/${sessionId}/records`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marks: payload }),
-      });
+      const post = (reason?: string) =>
+        fetch(`/api/backend/api/attendance/sessions/${sessionId}/records`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marks: payload, reason }),
+        });
+      let res = await post();
+      if (res.status === 422) {
+        // Changing an already-recorded status needs a reason (it goes into the audit log and
+        // the student is told). Ask once for the whole save, then retry.
+        const body = await res.clone().json().catch(() => ({}));
+        const ids: number[] = body?.detail?.needs_reason ?? [];
+        if (ids.length) {
+          const names = rows.filter((r) => ids.includes(r.user_id)).map((r) => r.display_name);
+          const reason = await askReason({
+            title: `Reason for changing ${ids.length} recorded mark${ids.length === 1 ? "" : "s"}`,
+            body: `${names.slice(0, 6).join(", ")}${names.length > 6 ? ` and ${names.length - 6} more` : ""} already had a different status. Your reason is recorded in the audit log and sent to the student.`,
+            confirmLabel: "Save with reason",
+            reason: { label: "Reason", minLength: 3 },
+          });
+          if (!reason) {
+            setState("idle");
+            setMessage("Not saved — a reason is needed to change recorded marks. Your marks are kept.");
+            return;
+          }
+          res = await post(reason);
+        }
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         const detail = body?.detail?.message ?? body?.detail ?? body?.error;
@@ -191,7 +216,7 @@ export function Register({ initial }: { initial: RosterPayload }) {
       setState("error");
       setMessage("No connection. Your marks are saved on this device and will not be lost.");
     }
-  }, [locked, marks, rows, sessionId]);
+  }, [locked, marks, rows, sessionId, askReason]);
 
   /* ---------------------------------------------------------------- keyboard */
 

@@ -41,6 +41,7 @@ const STATUS_COLOR: Record<string, string> = {
   late: "var(--status-late)",
   absent: "var(--status-absent)",
   excused: "var(--status-excused)",
+  on_leave: "var(--status-leave)",
 };
 
 /** Must match `MARK_LETTER` in components/ui.tsx — the register's own alphabet. */
@@ -49,6 +50,7 @@ const STATUS_LETTER: Record<string, string> = {
   late: "L",
   absent: "A",
   excused: "E",
+  on_leave: "O",
 };
 
 /* --------------------------------------------------------------- the ring */
@@ -313,10 +315,10 @@ export function AttendanceCalendar({
       })}
 
       <div className="flex flex-wrap gap-3 text-[12px] text-ash">
-        {(["present", "late", "absent", "excused"] as const).map((s) => (
+        {(["present", "late", "absent", "on_leave", "excused"] as const).map((s) => (
           <span key={s} className="inline-flex items-center gap-1.5">
             <Mark status={s} />
-            {s}
+            {s.replace("_", " ")}
           </span>
         ))}
       </div>

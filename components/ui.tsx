@@ -80,6 +80,7 @@ const MARK_LETTER: Record<string, string> = {
   left_early: "<",
   on_duty: "D",
   excused: "E",
+  on_leave: "O",
   needs_review: "?",
 };
 
@@ -91,6 +92,7 @@ const MARK_COLOR: Record<string, string> = {
   left_early: "var(--status-late)",
   on_duty: "var(--status-present)",
   excused: "var(--status-excused)",
+  on_leave: "var(--status-leave)",
   needs_review: "var(--status-absent)",
 };
 

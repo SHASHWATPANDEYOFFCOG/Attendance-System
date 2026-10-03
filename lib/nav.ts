@@ -12,7 +12,8 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
     {
       items: [
         { href: "/dashboard", label: "Dashboard", exact: true },
-        { href: "/mark", label: "Mark attendance" },
+        { href: "/staff/sessions", label: "Live sessions" },
+        { href: "/mark", label: "Registers" },
         { href: "/reports", label: "Reports" },
       ],
     },
@@ -40,6 +41,8 @@ export function studentNav(counts: Counts = {}): NavGroup[] {
     {
       items: [
         { href: "/student", label: "Dashboard", exact: true },
+        { href: "/student/mark", label: "Mark attendance" },
+        { href: "/student/history", label: "History" },
         { href: "/student/profile", label: "My profile" },
       ],
     },

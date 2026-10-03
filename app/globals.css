@@ -51,6 +51,9 @@
   --status-late:    #A8731A;
   --status-absent:  #9A3B2E;
   --status-excused: #6E7468;
+  /* On leave reuses the validated series-1 blue: distinct from present/late/absent under all
+     three common colour-vision deficiencies, and always paired with the letter "O". */
+  --status-leave:   #3D6DA8;
 
   --shadow-sm: 0 1px 0 rgb(22 48 79 / 0.05);
   --shadow-md: 0 1px 0 rgb(22 48 79 / 0.06), 0 8px 24px -18px rgb(22 48 79 / 0.5);
@@ -95,6 +98,7 @@
   --status-late:    #E2A945;
   --status-absent:  #E4785F;
   --status-excused: #93A1B2;
+  --status-leave:   #5289C4;
 
   --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
   --shadow-md: 0 1px 0 rgb(0 0 0 / 0.35), 0 8px 24px -18px rgb(0 0 0 / 0.9);
@@ -112,7 +116,7 @@
     --seq-0: #1A222C; --seq-1: #22303F; --seq-2: #2C4358;
     --seq-3: #375875; --seq-4: #446E96; --seq-5: #5289C4;
     --status-present: #5DBF92; --status-late: #E2A945;
-    --status-absent: #E4785F; --status-excused: #93A1B2;
+    --status-absent: #E4785F; --status-excused: #93A1B2; --status-leave: #5289C4;
     --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
     --shadow-md: 0 1px 0 rgb(0 0 0 / 0.35), 0 8px 24px -18px rgb(0 0 0 / 0.9);
     --shadow-lg: 0 1px 0 rgb(0 0 0 / 0.4),  0 14px 34px -20px rgb(0 0 0 / 0.95);

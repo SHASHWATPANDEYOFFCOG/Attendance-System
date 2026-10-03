@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Attendance Register</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="auth">
+<div class="wrap" style="max-width:460px">
+
+  <header class="bar">
+    <div>
+      <h1>Attendance Register</h1>
+      <div class="sub">Occlusion-robust face recognition</div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" id="tabIn"  onclick="show('in')">Sign in</button>
+    <button class="tab"        id="tabUp"  onclick="show('up')">Register</button>
+  </nav>
+
+  <div class="card" id="pane_in">
+    <form onsubmit="doLogin(event)">
+      <div class="field">
+        <label class="label" for="u">Username or roll number</label>
+        <input id="u" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label class="label" for="p">Password</label>
+        <input id="p" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" style="width:100%">Sign in</button>
+    </form>
+  </div>
+
+  <div class="card" id="pane_up" hidden>
+    <form onsubmit="doRegister(event)">
+      <div class="field">
+        <label class="label" for="r_name">Full name</label>
+        <input id="r_name" required>
+      </div>
+      <div class="field">
+        <label class="label" for="r_user">Username</label>
+        <input id="r_user" minlength="3" required>
+      </div>
+      <div class="field">
+        <label class="label" for="r_roll">Roll number</label>
+        <input id="r_roll">
+      </div>
+      <div class="field">
+        <label class="label" for="r_email">Email</label>
+        <input id="r_email" type="email">
+      </div>
+      <div class="field">
+        <label class="label" for="r_pass">Password</label>
+        <input id="r_pass" type="password" minlength="8" required>
+      </div>
+      <p class="muted" style="font-size:13px">
+        Registering creates a student account. Face enrolment is a separate, explicitly
+        consented step — see <a href="#" onclick="alert('See PRIVACY.md shipped with this system.')">how your data is handled</a>.
+      </p>
+      <button class="btn" style="width:100%">Create account</button>
+    </form>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+function show(which) {
+  document.getElementById('pane_in').hidden = which !== 'in';
+  document.getElementById('pane_up').hidden = which !== 'up';
+  document.getElementById('tabIn').classList.toggle('active', which === 'in');
+  document.getElementById('tabUp').classList.toggle('active', which === 'up');
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  try {
+    const b = await api('/api/auth/login', { method: 'POST', json: {
+      username: document.getElementById('u').value.trim(),
+      password: document.getElementById('p').value
+    }});
+    store.token = b.access_token;
+    store.refresh = b.refresh_token;
+    store.role = b.role;
+    store.name = b.display_name;
+    location.href = 'dashboard.html';
+  } catch (err) { toast(err.message, 'err'); }
+}
+
+async function doRegister(e) {
+  e.preventDefault();
+  try {
+    await api('/api/auth/register', { method: 'POST', json: {
+      display_name: document.getElementById('r_name').value.trim(),
+      username: document.getElementById('r_user').value.trim(),
+      roll_number: document.getElementById('r_roll').value.trim() || null,
+      email: document.getElementById('r_email').value.trim() || null,
+      password: document.getElementById('r_pass').value
+    }});
+    toast('Account created. Sign in to continue.');
+    show('in');
+  } catch (err) { toast(err.message, 'err'); }
+}
+
+if (store.token) location.href = 'dashboard.html';
+</script>
+</body>
+</html>

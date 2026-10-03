@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enrolment · Attendance Register</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap" style="max-width:900px">
+
+  <header class="bar">
+    <div>
+      <h1>Face enrolment</h1>
+      <div class="sub">One template per person · quality-gated · duplicates refused</div>
+    </div>
+    <div class="row">
+      <a class="btn ghost small" href="dashboard.html">Back</a>
+      <button class="btn ghost small" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <div id="banners"></div>
+
+  <!-- Consent must be recorded BEFORE any biometric is captured. -->
+  <div class="card" style="margin-bottom:16px">
+    <h2>1 · Consent</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:0">
+      Enrolment creates a mathematical template of your face. It is encrypted at rest and used
+      only to mark attendance. A face template cannot be reissued if it leaks, unlike a password,
+      so consent is explicit and revocable. Withdrawing consent deletes the template; your
+      attendance history remains as an academic record.
+    </p>
+    <label class="row" style="gap:9px;align-items:center;cursor:pointer">
+      <input type="checkbox" id="consent" style="width:auto" onchange="saveConsent(this.checked)">
+      <span>I consent to my face being enrolled for attendance.</span>
+    </label>
+    <div style="margin-top:10px">
+      <span class="pill" id="consentState">unknown</span>
+      <button class="btn danger small" onclick="eraseMine()">Delete my face data</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2>2 · Samples</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:0">
+      Provide at least <strong id="minImgs">5</strong> photos across varied pose and lighting.
+      Enrolment quality sets the ceiling on everything afterwards, so each sample is scored and
+      poor ones are rejected with a reason.
+    </p>
+    <div class="row">
+      <input type="file" id="files" accept="image/*" multiple style="flex:1;min-width:240px">
+      <button class="btn ghost" onclick="startCam()">Use webcam</button>
+      <button class="btn" onclick="submitEnrol()" id="go">Enrol</button>
+    </div>
+
+    <div id="camWrap" hidden style="margin-top:14px">
+      <video id="cam" autoplay playsinline muted
+             style="width:100%;max-width:380px;border:1px solid var(--rule);border-radius:3px"></video>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" onclick="capture()">Capture frame</button>
+        <span class="muted data" id="shots">0 captured</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Result</h2>
+    <div id="result"><div class="empty">Nothing submitted yet.</div></div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+let ME = null, SHOTS = [], STREAM = null;
+
+async function boot() {
+  if (!requireAuth()) return;
+  try {
+    ME = await api('/api/me');
+    const sys = await api('/api/system/status');
+    renderBanners(sys, 'banners');
+    document.getElementById('minImgs').textContent = sys.thresholds ? '5' : '5';
+    setConsentUi(ME.consent_given);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function setConsentUi(given) {
+  document.getElementById('consent').checked = !!given;
+  const el = document.getElementById('consentState');
+  el.textContent = given ? 'consent recorded' : 'consent not given — enrolment blocked';
+  el.className = 'pill ' + (given ? 'ok' : 'bad');
+  document.getElementById('go').disabled = !given;
+}
+
+async function saveConsent(on) {
+  try {
+    const u = await api('/api/me/consent', { method: 'POST',
+      json: { consent_given: on, consent_text_version: 'v1' } });
+    setConsentUi(u.consent_given);
+    toast(on ? 'Consent recorded.' : 'Consent withdrawn.');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function startCam() {
+  try {
+    STREAM = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    document.getElementById('camWrap').hidden = false;
+    document.getElementById('cam').srcObject = STREAM;
+  } catch (e) { toast('Camera unavailable: ' + e.message, 'err'); }
+}
+
+function capture() {
+  const v = document.getElementById('cam');
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  c.toBlob(b => {
+    SHOTS.push(b);
+    document.getElementById('shots').textContent = SHOTS.length + ' captured';
+  }, 'image/jpeg', 0.95);
+}
+
+async function submitEnrol() {
+  const picked = document.getElementById('files').files;
+  if (!picked.length && !SHOTS.length) { toast('Add photos or capture from the webcam.', 'err'); return; }
+
+  const fd = new FormData();
+  for (const f of picked) fd.append('files', f, f.name);
+  SHOTS.forEach((b, i) => fd.append('files', b, `cam_${i}.jpg`));
+
+  document.getElementById('go').disabled = true;
+  try {
+    const r = await api(`/api/users/${ME.id}/enroll`, { method: 'POST', body: fd });
+    renderResult(r, true);
+    toast(`Enrolled with ${r.n_accepted} sample(s).`);
+    SHOTS = [];
+    if (STREAM) STREAM.getTracks().forEach(t => t.stop());
+  } catch (e) {
+    let parsed = null;
+    try { parsed = JSON.parse(e.message); } catch {}
+    renderResult(parsed || { error: e.message }, false);
+    toast(e.message.slice(0, 160), 'err');
+  } finally { document.getElementById('go').disabled = false; }
+}
+
+function renderResult(r, ok) {
+  const host = document.getElementById('result');
+  const samples = r.samples || [];
+  const head = ok
+    ? `<div class="banner"><strong>Enrolled</strong>
+         ${r.n_accepted} sample(s) accepted · mean quality
+         <span class="data">${(r.mean_quality ?? 0).toFixed(3)}</span> ·
+         weakest <span class="data">${(r.min_quality ?? 0).toFixed(3)}</span></div>`
+    : `<div class="banner bad"><strong>Not enrolled</strong>${esc(r.message || r.error || '')}</div>`;
+
+  const rows = samples.map(s => `
+    <tr>
+      <td>${s.accepted ? '<span class="mark present">P</span>'
+                       : '<span class="mark absent">A</span>'}</td>
+      <td class="mono">${esc(s.filename)}</td>
+      <td class="num">${(s.quality ?? 0).toFixed(3)}</td>
+      <td class="mono">${esc(s.occlusion)}</td>
+      <td>${esc(s.reason)}</td>
+    </tr>`).join('');
+
+  host.innerHTML = head + (rows ? `
+    <div class="ledger-wrap"><table class="ledger">
+      <thead><tr><th style="width:34px"></th><th>File</th><th>Quality</th>
+                 <th>Occlusion</th><th>Verdict</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>` : '');
+}
+
+async function eraseMine() {
+  if (!confirm('Delete your face template and all stored crops? Attendance history is kept.')) return;
+  try {
+    const r = await api(`/api/users/${ME.id}/biometrics`, { method: 'DELETE' });
+    toast(`Deleted ${r.templates_deleted} template(s) and ${r.thumbnails_deleted} image(s).`);
+    setConsentUi(false);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+boot();
+</script>
+</body>
+</html>

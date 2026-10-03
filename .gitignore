@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+
+# Model weights / datasets / outputs (do not commit biometric data!)
+*.onnx
+*.engine
+*.trt
+*.pth
+*.pt
+gallery_store/
+runs/
+out*.jpg
+out*.mp4
+
+# Datasets and runtime state.
+# NOTE the leading slash. Upstream used a bare `data/`, which git applies at EVERY directory
+# level -- that silently excluded the `occlubio/data/` PACKAGE from the published repo and broke
+# scripts/make_occluded_dataset.py on a fresh clone. Anchor these to the repo root.
+/data/
+/var/
+
+# insightface model cache
+.insightface/
+
+# generated reports
+*.pdf
+
+# secrets and databases -- never commit these
+*.db
+*.db-wal
+*.db-shm
+*.key
+.env
+
+# IDE / OS / tooling
+.vscode/
+.idea/
+.qodo/
+.DS_Store
+Thumbs.db
+*.log
+
+# Separate projects / repos living in this folder
+/web-next/
+/axon-landing/

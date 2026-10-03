@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports · Attendance Register</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <div>
+      <h1>Reports</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="row">
+      <a class="btn ghost small" href="dashboard.html">Register</a>
+      <button class="btn ghost small" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <div id="banners"></div>
+
+  <div class="row" style="margin-bottom:16px">
+    <div style="flex:1;min-width:280px">
+      <label class="label" for="sess">Session</label>
+      <select id="sess" onchange="load(this.value)"></select>
+    </div>
+    <button class="btn" onclick="exportCsv()">Download CSV</button>
+    <button class="btn ghost" onclick="unknowns()">Unknown faces</button>
+  </div>
+
+  <div class="grid cols-4" style="margin-bottom:16px">
+    <div class="card stat"><span class="label">Attendance</span>
+      <div class="n" id="k_pct">—</div></div>
+    <div class="card stat"><span class="label">Minimum required</span>
+      <div class="n small" id="k_min">—</div></div>
+    <div class="card stat"><span class="label">Rostered</span>
+      <div class="n small" id="k_total">—</div></div>
+    <div class="card stat"><span class="label">Needs review</span>
+      <div class="n small oxide" id="k_rev">—</div></div>
+  </div>
+
+  <div class="card ruled">
+    <header><h2 style="margin:0">Register</h2>
+      <span class="muted data" id="meta"></span></header>
+    <div class="ledger-wrap">
+      <table class="ledger">
+        <thead><tr>
+          <th style="width:34px"></th><th>Name</th><th>Roll</th><th>First</th><th>Last</th>
+          <th>Visible</th><th>Conf.</th><th>Frames</th><th>Status</th><th>Evidence</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" hidden>Nothing to show.</div>
+  </div>
+
+  <div class="card" style="margin-top:16px" id="unkCard" hidden>
+    <h2>Unknown faces</h2>
+    <p class="muted" style="font-size:13px;margin-top:0">
+      Faces that never matched anyone above the review threshold. They are never auto-assigned —
+      assigning one is a recorded human decision.
+    </p>
+    <div id="unk"></div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+let SID = null;
+
+async function boot() {
+  if (!requireAuth()) return;
+  try {
+    const d = await api('/api/dashboard');
+    setTimezone(d.timezone);
+    document.getElementById('sub').textContent =
+      `${d.timezone} · stored UTC · match_threshold ${d.system?.thresholds?.match_threshold ?? '—'}`;
+    renderBanners(d.system, 'banners');
+    const sessions = await api('/api/sessions');
+    document.getElementById('sess').innerHTML = sessions.map(s =>
+      `<option value="${s.id}">${esc(s.title)} · ${esc(s.room)} · ${fmtDateTime(s.scheduled_start)}</option>`
+    ).join('');
+    if (sessions.length) load(sessions[0].id);
+    else document.getElementById('empty').hidden = false;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function load(id) {
+  SID = id;
+  document.getElementById('unkCard').hidden = true;
+  try {
+    const d = await api(`/api/sessions/${id}/attendance`);
+    const s = d.summary || {};
+    document.getElementById('k_pct').className     = 'n ' + (s.meets_minimum ? '' : 'oxide');
+    setStat('k_pct',   Math.round(s.attendance_pct ?? 0), '%');
+    setStat('k_min',   Math.round(s.minimum_pct ?? 0), '%');
+    setStat('k_total', s.total ?? 0);
+    setStat('k_rev',   s.needs_review ?? 0);
+    document.getElementById('meta').textContent =
+      `${esc(d.session.title)} · ${esc(d.session.room)} · ${esc(d.session.mode)} mode`;
+
+    const rows = d.records || [];
+    document.getElementById('empty').hidden = rows.length > 0;
+    document.getElementById('rows').innerHTML = rows.map(r => `
+      <tr id="rep-${r.id}">
+        <td>${markFor(r.effective_status)}</td>
+        <td>${esc(r.display_name)}</td>
+        <td class="mono">${esc(r.roll_number || '—')}</td>
+        <td class="mono">${fmtTime(r.first_seen)}</td>
+        <td class="mono">${fmtTime(r.last_seen)}</td>
+        <td class="num">${fmtDuration(r.total_visible_s)}</td>
+        <td class="num">${r.avg_confidence ? r.avg_confidence.toFixed(3) : '—'}</td>
+        <td class="num">${r.frames_matched || 0}</td>
+        <td><span class="pill ${r.effective_status === 'present' ? 'ok'
+              : (r.effective_status === 'absent' ? 'bad' : 'warn')}">${esc(r.effective_status)}</span>
+            ${r.overridden_status ? '<span class="pill">overridden</span>' : ''}</td>
+        <td class="muted" style="font-size:12.5px">${esc(r.review_reason || r.evidence || '')}</td>
+      </tr>`).join('');
+    revealNew('report-' + id, '#rows tr');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function exportCsv() {
+  if (!SID) return;
+  try {
+    const text = await api('/api/reports/attendance.csv?session_id=' + SID);
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `attendance_session_${SID}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function unknowns() {
+  if (!SID) return;
+  try {
+    const list = await api(`/api/sessions/${SID}/unknowns`);
+    document.getElementById('unkCard').hidden = false;
+    document.getElementById('unk').innerHTML = list.length ? list.map(u => `
+      <div class="row" style="justify-content:space-between;border-bottom:1px dashed var(--rule);padding:8px 0">
+        <div>
+          <strong>Track #${u.track_id}</strong>
+          <span class="muted data"> ${fmtTime(u.first_seen)}–${fmtTime(u.last_seen)}
+          · best ${u.best_score.toFixed(3)} · ${u.frames} frames</span>
+        </div>
+        ${u.resolved_user_id
+          ? `<span class="pill ok">assigned to #${u.resolved_user_id}</span>`
+          : `<button class="btn small ghost" onclick="assign(${u.id})">Assign to a person</button>`}
+      </div>`).join('') : '<div class="empty">No unknown faces recorded.</div>';
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function assign(unknownId) {
+  const uid = prompt('User id to assign this face to:');
+  if (!uid) return;
+  const reason = prompt('Reason (required — audit logged):');
+  if (!reason) { toast('A reason is required.', 'err'); return; }
+  try {
+    await api(`/api/sessions/${SID}/unknowns/${unknownId}/assign`, { method: 'POST',
+      json: { user_id: parseInt(uid, 10), reason } });
+    toast('Assigned and recomputed.');
+    unknowns(); load(SID);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+boot();
+</script>
+</body>
+</html>

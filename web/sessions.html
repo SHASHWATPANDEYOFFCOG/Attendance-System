@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sessions &amp; cameras · Attendance Register</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <div>
+      <h1>Sessions &amp; cameras</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="row">
+      <a class="btn ghost small" href="dashboard.html">Register</a>
+      <button class="btn ghost small" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <div id="banners"></div>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>New session</h2>
+      <form onsubmit="createSession(event)">
+        <div class="field"><label class="label" for="t">Title</label>
+          <input id="t" required placeholder="CS301 · Lecture 12"></div>
+        <div class="row">
+          <div class="field" style="flex:1"><label class="label" for="room">Room</label>
+            <input id="room" required placeholder="LH-4"></div>
+          <div class="field" style="flex:1"><label class="label" for="mode">Mode</label>
+            <select id="mode">
+              <option value="kiosk">Kiosk — first check-in at the door</option>
+              <option value="room">Room — accumulate visible time</option>
+            </select></div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1"><label class="label" for="st">Start</label>
+            <input id="st" type="datetime-local" required></div>
+          <div class="field" style="flex:1"><label class="label" for="en">End</label>
+            <input id="en" type="datetime-local" required></div>
+        </div>
+        <p class="muted" style="font-size:12.5px">
+          Times are entered in your local zone and stored as UTC.
+        </p>
+        <button class="btn">Create session</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>New camera</h2>
+      <form onsubmit="createCamera(event)">
+        <div class="field"><label class="label" for="cname">Name</label>
+          <input id="cname" required placeholder="door-lh4"></div>
+        <div class="field"><label class="label" for="croom">Room</label>
+          <input id="croom" required placeholder="LH-4"></div>
+        <div class="field"><label class="label" for="csrc">Source</label>
+          <input id="csrc" required placeholder="0  or  rtsp://user:pass@host/stream">
+          <span class="muted" style="font-size:12.5px">
+            A device index for USB, or an RTSP URL.</span></div>
+        <div class="field"><label class="label" for="cmode">Mode</label>
+          <select id="cmode"><option value="kiosk">kiosk</option><option value="room">room</option></select></div>
+        <button class="btn">Register camera</button>
+        <p class="muted" style="font-size:12.5px">Admin only.</p>
+      </form>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <header><h2 style="margin:0">Sessions</h2>
+      <span class="muted data" id="sessCount"></span></header>
+    <div class="ledger-wrap">
+      <table class="ledger">
+        <thead><tr><th>Title</th><th>Room</th><th>Mode</th><th>Start</th><th>End</th>
+                   <th>Roster</th><th></th></tr></thead>
+        <tbody id="sessions"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Roster</h2>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:220px">
+        <label class="label" for="rsess">Session</label>
+        <select id="rsess"></select></div>
+      <div class="field" style="flex:2;min-width:260px">
+        <label class="label" for="usearch">Add people</label>
+        <input id="usearch" placeholder="search name / username / roll" oninput="searchUsers()"></div>
+    </div>
+    <div id="found"></div>
+    <div style="margin-top:12px">
+      <span class="label">Selected</span>
+      <div id="chosen" class="row"></div>
+      <button class="btn" style="margin-top:10px" onclick="saveRoster()">Save roster</button>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+let SESSIONS = [], CHOSEN = new Map();
+
+async function boot() {
+  if (!requireAuth()) return;
+  try {
+    const d = await api('/api/dashboard');
+    setTimezone(d.timezone);
+    document.getElementById('sub').textContent = `${d.timezone} · stored UTC`;
+    renderBanners(d.system, 'banners');
+    await loadSessions();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function loadSessions() {
+  SESSIONS = await api('/api/sessions');
+  document.getElementById('sessCount').textContent = SESSIONS.length + ' session(s)';
+  document.getElementById('sessions').innerHTML = SESSIONS.map(s => `
+    <tr>
+      <td>${esc(s.title)}</td>
+      <td class="mono">${esc(s.room)}</td>
+      <td><span class="pill">${esc(s.mode)}</span></td>
+      <td class="mono">${fmtDateTime(s.scheduled_start)}</td>
+      <td class="mono">${fmtDateTime(s.scheduled_end)}</td>
+      <td class="num" id="rc-${s.id}">—</td>
+      <td><a class="btn ghost small" href="dashboard.html">Open</a></td>
+    </tr>`).join('');
+  document.getElementById('rsess').innerHTML = SESSIONS.map(s =>
+    `<option value="${s.id}">${esc(s.title)} · ${esc(s.room)}</option>`).join('');
+}
+
+async function createSession(e) {
+  e.preventDefault();
+  try {
+    await api('/api/sessions', { method: 'POST', json: {
+      title: document.getElementById('t').value,
+      room: document.getElementById('room').value,
+      mode: document.getElementById('mode').value,
+      scheduled_start: new Date(document.getElementById('st').value).toISOString(),
+      scheduled_end: new Date(document.getElementById('en').value).toISOString()
+    }});
+    toast('Session created.');
+    e.target.reset();
+    loadSessions();
+  } catch (err) { toast(err.message, 'err'); }
+}
+
+async function createCamera(e) {
+  e.preventDefault();
+  try {
+    await api('/api/cameras', { method: 'POST', json: {
+      name: document.getElementById('cname').value,
+      room: document.getElementById('croom').value,
+      source: document.getElementById('csrc').value,
+      mode: document.getElementById('cmode').value
+    }});
+    toast('Camera registered.');
+    e.target.reset();
+  } catch (err) { toast(err.message, 'err'); }
+}
+
+let searchTimer = null;
+function searchUsers() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const q = document.getElementById('usearch').value.trim();
+    if (!q) { document.getElementById('found').innerHTML = ''; return; }
+    try {
+      const users = await api('/api/users?q=' + encodeURIComponent(q));
+      document.getElementById('found').innerHTML = users.slice(0, 24).map(u => `
+        <button class="btn ghost small" style="margin:3px 3px 0 0"
+                onclick="pick(${u.id}, '${esc(u.display_name).replace(/'/g, "\\'")}')">
+          ${esc(u.display_name)} <span class="muted">${esc(u.roll_number || u.username)}</span>
+          ${u.has_biometrics ? '' : ' · <span class="oxide">not enrolled</span>'}
+        </button>`).join('');
+    } catch (e) { toast(e.message, 'err'); }
+  }, 220);
+}
+
+function pick(id, name) { CHOSEN.set(id, name); renderChosen(); }
+function unpick(id) { CHOSEN.delete(id); renderChosen(); }
+function renderChosen() {
+  document.getElementById('chosen').innerHTML = [...CHOSEN].map(([id, name]) =>
+    `<button class="btn ghost small" onclick="unpick(${id})">${esc(name)} ✕</button>`).join('')
+    || '<span class="muted">Nobody selected.</span>';
+}
+
+async function saveRoster() {
+  const sid = document.getElementById('rsess').value;
+  if (!sid) return;
+  try {
+    const r = await api(`/api/sessions/${sid}/roster`, { method: 'POST',
+      json: { user_ids: [...CHOSEN.keys()] } });
+    toast(`Roster saved — ${r.roster_size} person(s).`);
+    const cell = document.getElementById('rc-' + sid);
+    if (cell) cell.textContent = r.roster_size;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+renderChosen();
+boot();
+</script>
+</body>
+</html>

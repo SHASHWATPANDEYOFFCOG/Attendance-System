@@ -1,0 +1,549 @@
+/* ============================================================================
+   Attendance register design system.
+
+   Palette, type and the register metaphor are fixed by the build spec (B8) and are NOT
+   redesigned here -- this file adds the system layer around them: motion, elevation,
+   spacing, focus and a dark palette.
+
+   Constraints held: no framework, no build step, no CDN beyond the webfonts, zero JS
+   dependencies. Everything below is plain CSS.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+/* ----------------------------------------------------------------- tokens */
+
+:root {
+  /* Brand -- fixed by B8, do not redefine per-component. */
+  --paper: #F4F5F0;
+  --card:  #FCFCF9;
+  --rule:  #D9DDD3;
+  --ink:   #16304F;
+  --oxide: #9A3B2E;
+  --amber: #A8731A;
+  --ash:   #6E7468;
+
+  /* Semantic. `verdant` was previously hardcoded as #2E6B4F in three places; it is a
+     token now so dark mode can lift it to a legible value. */
+  --verdant: #2E6B4F;
+  --focus:   #16304F;
+
+  /* Surfaces derived from the brand set, so depth never introduces a new hue. */
+  --card-hover: #FFFFFF;
+  --tint:       rgba(22, 48, 79, .035);
+  --tint-hard:  rgba(22, 48, 79, .07);
+  --glass:      rgba(252, 252, 249, .82);
+
+  --label: 'Barlow Condensed', system-ui, sans-serif;
+  --data:  'IBM Plex Mono', ui-monospace, monospace;
+  --body:  'IBM Plex Sans', system-ui, sans-serif;
+
+  /* 8pt spacing scale. */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  --line-h: 30px;                 /* the ruled-paper rhythm; ledger rows lock to this */
+  --rule-offset: 44px;            /* where ruling starts, below a card header */
+
+  /* Radius scale. */
+  --r-sm: 2px; --r-md: 3px; --r-lg: 6px; --r-xl: 10px;
+
+  /* Elevation. Layered rather than single-blur, so cards read as paper on paper. */
+  --shadow-sm: 0 1px 0 rgba(22,48,79,.05);
+  --shadow-md: 0 1px 0 rgba(22,48,79,.06), 0 8px 24px -18px rgba(22,48,79,.5);
+  --shadow-lg: 0 1px 0 rgba(22,48,79,.07), 0 14px 34px -20px rgba(22,48,79,.55);
+  --shadow-xl: 0 2px 0 rgba(22,48,79,.08), 0 28px 60px -28px rgba(22,48,79,.6);
+  --shadow-focus: 0 0 0 3px rgba(22,48,79,.18);
+
+  /* Motion. Micro-interactions 150-300ms, larger transitions 300-500ms.
+     ease-out for entrances, ease-in-out for movement -- never linear. */
+  --dur-fast: 150ms;
+  --dur:      240ms;
+  --dur-slow: 420ms;
+  --ease-out:    cubic-bezier(.22, .8, .3, 1);
+  --ease-in-out: cubic-bezier(.5, 0, .3, 1);
+  --ease-spring: cubic-bezier(.2, 1.25, .4, 1);
+
+  --shadow: var(--shadow-md);     /* retained: earlier markup referenced --shadow */
+  --radius: var(--r-md);
+  color-scheme: light;
+}
+
+/* Dark palette. Applied on system preference, and overridable either way by the
+   toggle stamping data-theme on <html>. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #11161D;
+    --card:  #18202A;
+    --rule:  #2B3542;
+    --ink:   #E6EBF2;
+    --oxide: #E4785F;
+    --amber: #E2A945;
+    --ash:   #93A1B2;
+    --verdant: #5DBF92;
+    --focus:   #9FC2E8;
+
+    --card-hover: #1D2733;
+    --tint:       rgba(230, 235, 242, .045);
+    --tint-hard:  rgba(230, 235, 242, .09);
+    --glass:      rgba(24, 32, 42, .82);
+
+    --shadow-sm: 0 1px 0 rgba(0,0,0,.3);
+    --shadow-md: 0 1px 0 rgba(0,0,0,.35), 0 8px 24px -18px rgba(0,0,0,.9);
+    --shadow-lg: 0 1px 0 rgba(0,0,0,.4),  0 14px 34px -20px rgba(0,0,0,.95);
+    --shadow-xl: 0 2px 0 rgba(0,0,0,.45), 0 28px 60px -28px rgba(0,0,0,1);
+    --shadow-focus: 0 0 0 3px rgba(159,194,232,.3);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #11161D;
+  --card:  #18202A;
+  --rule:  #2B3542;
+  --ink:   #E6EBF2;
+  --oxide: #E4785F;
+  --amber: #E2A945;
+  --ash:   #93A1B2;
+  --verdant: #5DBF92;
+  --focus:   #9FC2E8;
+
+  --card-hover: #1D2733;
+  --tint:       rgba(230, 235, 242, .045);
+  --tint-hard:  rgba(230, 235, 242, .09);
+  --glass:      rgba(24, 32, 42, .82);
+
+  --shadow-sm: 0 1px 0 rgba(0,0,0,.3);
+  --shadow-md: 0 1px 0 rgba(0,0,0,.35), 0 8px 24px -18px rgba(0,0,0,.9);
+  --shadow-lg: 0 1px 0 rgba(0,0,0,.4),  0 14px 34px -20px rgba(0,0,0,.95);
+  --shadow-xl: 0 2px 0 rgba(0,0,0,.45), 0 28px 60px -28px rgba(0,0,0,1);
+  --shadow-focus: 0 0 0 3px rgba(159,194,232,.3);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--dur) var(--ease-in-out),
+              color var(--dur) var(--ease-in-out);
+}
+
+/* Paper grain. Inline SVG (~0.4 KB), fixed and non-interactive, so it never repaints
+   on scroll and never intercepts a click. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body::before { opacity: .28; }
+}
+:root[data-theme="dark"] body::before { opacity: .28; }
+
+.wrap, header.bar, #toast { position: relative; z-index: 1; }
+
+/* ------------------------------------------------------------------ type */
+
+.label, th, .tab, .btn, legend {
+  font-family: var(--label);
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  font-weight: 600;
+}
+
+.label { font-size: 12px; color: var(--ash); display: block; margin-bottom: 5px; }
+.data  { font-family: var(--data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ash); }
+.oxide { color: var(--oxide); }
+.amber { color: var(--amber); }
+
+h1 { font-family: var(--label); text-transform: uppercase; letter-spacing: .12em;
+     font-size: 26px; margin: 0 0 2px; font-weight: 600; }
+h2 { font-family: var(--label); text-transform: uppercase; letter-spacing: .12em;
+     font-size: 15px; margin: 0 0 var(--s3); color: var(--ash); font-weight: 600; }
+
+a { color: var(--ink); }
+
+/* ---------------------------------------------------------------- layout */
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 22px 20px var(--s8); }
+
+header.bar {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: var(--s3); margin-bottom: var(--s5);
+  display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s4);
+  flex-wrap: wrap;
+  transition: border-color var(--dur) var(--ease-in-out);
+}
+header.bar .sub { font-family: var(--data); font-size: 12px; color: var(--ash); }
+
+nav.tabs { display: flex; gap: var(--s1); flex-wrap: wrap; margin-bottom: 18px; }
+.tab {
+  font-size: 12px; padding: 7px 14px; border: 1px solid var(--rule);
+  border-bottom: 2px solid transparent; background: transparent; color: var(--ash);
+  cursor: pointer; border-radius: var(--r-md) var(--r-md) 0 0; text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.tab:hover { color: var(--ink); background: var(--tint); }
+.tab[aria-current="page"], .tab.active {
+  background: var(--card); color: var(--ink);
+  border-color: var(--rule); border-bottom-color: var(--oxide);
+}
+
+.grid { display: grid; gap: var(--s4); }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-2 { grid-template-columns: 1fr 1fr; }
+.split  { grid-template-columns: minmax(0,2fr) minmax(320px,1fr); align-items: start; }
+@media (max-width: 980px) {
+  .cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .cols-3, .cols-2, .split { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .cols-4 { grid-template-columns: 1fr; }
+  .wrap { padding: 18px 14px var(--s7); }
+}
+
+/* ----------------------------------------------------------------- card */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--s4) 18px;
+  transition: background-color var(--dur) var(--ease-in-out),
+              border-color var(--dur) var(--ease-in-out),
+              box-shadow var(--dur) var(--ease-out),
+              transform var(--dur) var(--ease-out);
+}
+.card.ruled {
+  background-image: repeating-linear-gradient(
+    to bottom, transparent, transparent calc(var(--line-h) - 1px), var(--rule) var(--line-h));
+  background-position: 0 var(--rule-offset);
+}
+.card > header { display: flex; justify-content: space-between; align-items: baseline;
+                 gap: var(--s3); margin-bottom: 10px; flex-wrap: wrap; }
+
+/* Lift only where a card is a summary the eye should be able to pick out. Lifting every
+   card in a dense data tool is noise, not polish. */
+.card.stat { cursor: default; }
+.card.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--ink) 22%, var(--rule));
+}
+
+/* ----------------------------------------------------------------- stats */
+
+.stat .n {
+  font-family: var(--data); font-size: 30px; font-weight: 600; line-height: 1.1;
+  transition: color var(--dur) var(--ease-out);
+}
+.stat .n.small { font-size: 21px; }
+
+/* Fires when a counter's value actually changes -- so the eye goes to the number that
+   moved, not to every number on load. Added/removed by app.js. */
+@keyframes tick {
+  0%   { transform: translateY(0)     scale(1);    }
+  35%  { transform: translateY(-3px)  scale(1.055); }
+  100% { transform: translateY(0)     scale(1);    }
+}
+.stat .n.changed { animation: tick var(--dur-slow) var(--ease-spring) both; }
+
+/* ---------------------------------------------------------------- ledger */
+
+.ledger-wrap { overflow-x: auto; }
+table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 720px; }
+table.ledger th {
+  font-size: 11px; color: var(--ash); text-align: left; padding: 0 10px var(--s2);
+  border-bottom: 2px solid var(--ink); white-space: nowrap;
+  transition: border-color var(--dur) var(--ease-in-out);
+}
+table.ledger td {
+  padding: 0 10px; height: var(--line-h); border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+table.ledger tbody tr {
+  transition: background-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+table.ledger tbody tr:hover { background: var(--tint); box-shadow: inset 3px 0 0 var(--ink); }
+table.ledger td.num, table.ledger td.mono { font-family: var(--data);
+  font-variant-numeric: tabular-nums; }
+
+/* One-shot row reveal. The class is applied once per row key by app.js, so an SSE
+   refresh that rebuilds the table does NOT re-animate rows that were already on screen
+   -- otherwise the whole roll would strobe every time anyone checked in. */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+tr.row-in { animation: row-in var(--dur) var(--ease-out) both; }
+
+/* The register mark: P / A / L etc. */
+.mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: var(--r-sm);
+  font-family: var(--data); font-weight: 600; font-size: 13px;
+  border: 1.5px solid currentColor;
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out),
+              background-color var(--dur) var(--ease-out);
+}
+.mark.present    { color: var(--verdant); }
+.mark.late       { color: var(--amber); }
+.mark.absent     { color: var(--oxide); }
+.mark.partial    { color: var(--amber); border-style: dashed; }
+.mark.left_early { color: var(--amber); border-style: dashed; }
+.mark.needs_review { color: var(--oxide); border-style: dotted; }
+tr:hover .mark { background: color-mix(in srgb, currentColor 12%, transparent); }
+
+.pill {
+  display: inline-block; font-family: var(--label); text-transform: uppercase;
+  letter-spacing: .1em; font-size: 10.5px; padding: 2px var(--s2); border-radius: 999px;
+  border: 1px solid var(--rule); color: var(--ash); white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.pill.warn { color: var(--amber); border-color: var(--amber); }
+.pill.bad  { color: var(--oxide); border-color: var(--oxide); }
+.pill.ok   { color: var(--verdant); border-color: var(--verdant); }
+
+/* ----------------------------------------------- confirmation pips + stamp */
+
+.pips { display: inline-flex; gap: 3px; vertical-align: middle; }
+.pip {
+  width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--ash);
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-spring);
+}
+.pip.on { background: var(--amber); border-color: var(--amber); transform: scale(1.18); }
+
+/* The pip that just filled pulses once -- this is the system saying "one more agreeing
+   frame", which is the single most informative moment in the product. */
+@keyframes pip-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 65%, transparent); }
+  100% { box-shadow: 0 0 0 7px transparent; }
+}
+.pip.on:last-of-type { animation: pip-pulse var(--dur-slow) var(--ease-out) both; }
+
+.feed { list-style: none; margin: 0; padding: 0; max-height: 460px; overflow-y: auto; }
+.feed li {
+  border-bottom: 1px dashed var(--rule); padding: 9px 2px;
+  display: flex; gap: 10px; align-items: baseline;
+  animation: row-in var(--dur) var(--ease-out) both;
+}
+.feed li .t { font-family: var(--data); font-size: 11px; color: var(--ash); min-width: 62px; }
+.feed li .who { font-weight: 600; }
+
+/* The confirmation stamp: what a check-in looks like when it lands. */
+.stamp {
+  display: inline-block; border: 2px solid var(--oxide); color: var(--oxide);
+  font-family: var(--label); text-transform: uppercase; letter-spacing: .18em;
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: var(--r-sm);
+  transform: rotate(-4deg);
+}
+@keyframes stamp-in {
+  0%   { transform: rotate(-14deg) scale(2.4); opacity: 0; }
+  60%  { transform: rotate(-4deg)  scale(.94); opacity: 1; }
+  100% { transform: rotate(-4deg)  scale(1); }
+}
+.stamp.fresh { animation: stamp-in var(--dur-slow) var(--ease-out) both; }
+
+/* --------------------------------------------------------------- controls */
+
+.btn {
+  font-size: 12px; padding: var(--s2) 15px; border-radius: var(--r-md); cursor: pointer;
+  border: 1px solid var(--ink); background: var(--ink); color: var(--card);
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.btn:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.985); box-shadow: none; }
+.btn.ghost  { background: transparent; color: var(--ink); }
+.btn.ghost:hover { background: var(--tint); }
+.btn.danger { background: var(--oxide); border-color: var(--oxide); color: #fff; }
+.btn.small  { padding: 5px 10px; font-size: 11px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+input, select, textarea {
+  font-family: var(--body); font-size: 14px; padding: 9px 11px; width: 100%;
+  border: 1px solid var(--rule); border-radius: var(--r-md);
+  background: var(--card); color: var(--ink);
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              background-color var(--dur) var(--ease-in-out);
+}
+input:hover, select:hover, textarea:hover { border-color: var(--ash); }
+.field { margin-bottom: var(--s3); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+
+/* -------------------------------------------------------------- focus ---- */
+/* Previously only inputs had a focus style, so keyboard users could not see where they
+   were on any button, tab or link. :focus-visible keeps it off mouse clicks. */
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: -1px;
+  border-color: var(--focus); box-shadow: var(--shadow-focus);
+}
+.btn:focus-visible { box-shadow: var(--shadow-focus); }
+
+/* ---------------------------------------------------------------- banners */
+
+.banner {
+  border-left: 4px solid var(--amber); background: color-mix(in srgb, var(--amber) 10%, transparent);
+  padding: 10px var(--s3); margin-bottom: var(--s3); font-size: 13.5px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  animation: row-in var(--dur) var(--ease-out) both;
+}
+.banner.bad { border-left-color: var(--oxide);
+              background: color-mix(in srgb, var(--oxide) 11%, transparent); }
+.banner strong { font-family: var(--label); text-transform: uppercase; letter-spacing: .1em;
+                 font-size: 12px; display: block; margin-bottom: 2px; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.dot.running { background: var(--verdant); }
+.dot.offline, .dot.error { background: var(--oxide); }
+.dot.stopped { background: var(--ash); }
+
+/* A running camera is the one status worth a heartbeat -- it is also conveyed by the
+   text label beside it, never by the animation alone. */
+@keyframes beat {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--verdant) 60%, transparent); }
+  50%      { box-shadow: 0 0 0 5px transparent; }
+}
+.dot.running { animation: beat 2.4s var(--ease-in-out) infinite; }
+
+#toast {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  display: flex; flex-direction: column; gap: var(--s2);
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+#toast div {
+  background: var(--ink); color: var(--card); padding: 10px 15px; border-radius: var(--r-md);
+  font-size: 13px; box-shadow: var(--shadow-lg); max-width: 380px;
+  animation: toast-in var(--dur) var(--ease-spring) both;
+}
+#toast div.err { background: var(--oxide); color: #fff; }
+
+.empty { padding: 26px var(--s2); text-align: center; color: var(--ash); font-size: 13.5px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ----------------------------------------------------------- theme toggle */
+
+.theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 30px; padding: 0;
+  border: 1px solid var(--rule); border-radius: var(--r-md);
+  background: transparent; color: var(--ash); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out);
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--ash); background: var(--tint); }
+.theme-toggle svg { width: 15px; height: 15px; }
+.theme-toggle .sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .sun  { display: block; }
+  :root:not([data-theme="light"]) .theme-toggle .moon { display: none; }
+}
+
+/* ------------------------------------------------------------ auth pages */
+/* The one screen with room for a hero moment. Depth comes from the existing tokens --
+   no new hue, no canvas, no image -- so it costs nothing and cannot drift off-brand. */
+
+body.auth { display: grid; place-items: center; min-height: 100vh; }
+body.auth .wrap { padding-block: var(--s6); width: 100%; }
+
+/* Two very soft washes behind the card. Fixed and non-interactive, painted once. */
+body.auth::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 50% 0%,   color-mix(in srgb, var(--ink) 9%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 85% 100%, color-mix(in srgb, var(--oxide) 8%, transparent), transparent 70%);
+}
+
+body.auth header.bar { border-bottom: none; justify-content: center; text-align: center; }
+body.auth header.bar h1 {
+  font-size: 30px;
+  background: linear-gradient(100deg, var(--ink) 30%, var(--oxide));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+/* The ruled underline is the register motif, reduced to a single stroke. */
+body.auth header.bar h1::after {
+  content: ''; display: block; height: 2px; margin-top: 10px;
+  background: linear-gradient(90deg, var(--ink), var(--oxide) 55%, transparent);
+}
+
+body.auth .card {
+  box-shadow: var(--shadow-xl);
+  padding: var(--s5);
+  animation: card-in var(--dur-slow) var(--ease-out) both;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+body.auth nav.tabs { justify-content: center; }
+
+/* No .row to slot into on this layout, so the toggle is parked in the corner. */
+body.auth .theme-toggle { position: fixed; top: var(--s4); right: var(--s4); z-index: 2; }
+
+/* --------------------------------------------------------- reduced motion */
+/* One global guard. Every animation above is decorative or confirmatory; none of them
+   carries information that is not also present in text, so removing them all is safe. */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:hover, .card.stat:hover { transform: none; }
+  .pip.on { transform: none; }
+}
+
+/* Touch: hover effects that imply a pointer should not stick after a tap. */
+@media (hover: none) {
+  .btn:hover, .card.stat:hover { transform: none; box-shadow: var(--shadow-md); }
+  table.ledger tbody tr:hover { background: transparent; box-shadow: none; }
+  /* 44px floor applies to every control, including .small -- a cramped "Override" or
+     "Sign out" is exactly the tap people miss. */
+  .btn, .tab, .theme-toggle, .btn.small { min-height: 44px; }
+  input, select, textarea { min-height: 44px; }
+}

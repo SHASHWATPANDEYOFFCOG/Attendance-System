@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attendance Register</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <div>
+      <h1>Attendance Register</h1>
+      <div class="sub" id="sub">loading…</div>
+    </div>
+    <div class="row">
+      <span class="pill" id="who"></span>
+      <button class="btn ghost small" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs"></nav>
+  <div id="banners"></div>
+
+  <!-- ================================================= STAFF ============ -->
+  <div id="staff" hidden>
+
+    <div class="row" style="margin-bottom:16px">
+      <div style="flex:1;min-width:260px">
+        <label class="label" for="sessionSel">Session</label>
+        <select id="sessionSel" onchange="loadSession(this.value)"></select>
+      </div>
+      <button class="btn ghost" onclick="recompute()">Recompute</button>
+      <button class="btn ghost" onclick="exportCsv()">Export CSV</button>
+    </div>
+
+    <div class="grid cols-4" style="margin-bottom:16px">
+      <div class="card stat"><span class="label">Present</span>
+        <div class="n" id="s_present">—</div></div>
+      <div class="card stat"><span class="label">Late</span>
+        <div class="n amber" id="s_late">—</div></div>
+      <div class="card stat"><span class="label">Absent</span>
+        <div class="n oxide" id="s_absent">—</div></div>
+      <div class="card stat"><span class="label">Needs review</span>
+        <div class="n" id="s_review">—</div></div>
+    </div>
+
+    <div class="grid split">
+      <div class="card ruled">
+        <header>
+          <h2 style="margin:0">The roll</h2>
+          <span class="muted data" id="rollMeta"></span>
+        </header>
+        <div class="ledger-wrap">
+          <table class="ledger">
+            <thead><tr>
+              <th style="width:34px"></th><th>Name</th><th>Roll</th>
+              <th>First seen</th><th>Visible</th><th>Conf.</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="roll"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="rollEmpty" hidden>No session selected.</div>
+      </div>
+
+      <div style="display:grid;gap:16px">
+        <div class="card">
+          <header><h2 style="margin:0">Live</h2>
+            <span class="pill" id="liveState">connecting</span></header>
+          <ul class="feed" id="feed"></ul>
+          <div class="empty" id="feedEmpty">Waiting for the first face…</div>
+        </div>
+
+        <div class="card">
+          <h2>Cameras</h2>
+          <div id="cams"></div>
+        </div>
+
+        <div class="card">
+          <h2>Review queue</h2>
+          <div id="review"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================== STUDENT =========== -->
+  <div id="student" hidden>
+    <div class="grid cols-3" style="margin-bottom:16px">
+      <div class="card stat"><span class="label">Your attendance</span>
+        <div class="n" id="m_pct">—</div></div>
+      <div class="card stat"><span class="label">Required</span>
+        <div class="n small" id="m_min">—</div></div>
+      <div class="card stat"><span class="label">Standing</span>
+        <div class="n small" id="m_ok">—</div></div>
+    </div>
+
+    <div class="card ruled">
+      <header><h2 style="margin:0">Your record</h2>
+        <span class="muted data" id="m_count"></span></header>
+      <div class="ledger-wrap">
+        <table class="ledger">
+          <thead><tr>
+            <th style="width:34px"></th><th>Session</th><th>When</th>
+            <th>First seen</th><th>Visible</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="mine"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="mineEmpty" hidden>No attendance recorded yet.</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+let STATE = { role: null, sessionId: null, records: [], candidates: {},
+              es: null, esSession: undefined };
+
+async function boot() {
+  if (!requireAuth()) return;
+  try {
+    const d = await api('/api/dashboard');
+    setTimezone(d.timezone);
+    STATE.role = d.role;
+    document.getElementById('who').textContent = `${d.user.display_name} · ${d.role}`;
+    document.getElementById('sub').textContent =
+      `${d.timezone} · stored UTC · server ${fmtDateTime(d.server_time_utc)}`;
+    renderBanners(d.system, 'banners');
+    renderTabs(d.role);
+
+    if (d.scope === 'self') renderStudent(d);
+    else renderStaff(d);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function renderTabs(role) {
+  const tabs = role === 'student'
+    ? [['dashboard.html','My attendance'], ['enroll.html','Enrol my face']]
+    : [['dashboard.html','Register'], ['sessions.html','Sessions & cameras'],
+       ['reports.html','Reports'], ['enroll.html','Enrolment']];
+  document.getElementById('tabs').innerHTML = tabs.map(([href,label]) => {
+    const cur = location.pathname.endsWith(href) ? ' aria-current="page"' : '';
+    return `<a class="tab"${cur} href="${href}">${label}</a>`;
+  }).join('');
+}
+
+/* ------------------------------------------------------------- student -- */
+
+function renderStudent(d) {
+  document.getElementById('student').hidden = false;
+  setStat('m_pct', Math.round(d.attendance_pct ?? 0), '%');
+  api('/api/me/attendance').then(m => {
+    document.getElementById('m_min').textContent = m.minimum_pct + '%';
+    const ok = m.meets_minimum;
+    const el = document.getElementById('m_ok');
+    el.textContent = ok ? 'Meets minimum' : 'Below minimum';
+    el.className = 'n small ' + (ok ? '' : 'oxide');
+    document.getElementById('m_count').textContent = m.records.length + ' session(s)';
+
+    const body = document.getElementById('mine');
+    document.getElementById('mineEmpty').hidden = m.records.length > 0;
+    body.innerHTML = m.records.map(r => `
+      <tr id="mine-${r.session_id}">
+        <td>${markFor(r.effective_status)}</td>
+        <td>${esc(r.session_title || '—')}</td>
+        <td class="mono">${fmtDateTime(r.session_start)}</td>
+        <td class="mono">${fmtTime(r.first_seen)}</td>
+        <td class="num">${fmtDuration(r.total_visible_s)}</td>
+        <td><span class="pill ${pillClass(r.effective_status)}">${esc(r.effective_status)}</span></td>
+        <td><button class="btn ghost small" onclick="dispute(${r.session_id})">Dispute</button></td>
+      </tr>`).join('');
+    revealNew('mine', '#mine tr');
+  }).catch(e => toast(e.message, 'err'));
+}
+
+async function dispute(sessionId) {
+  const message = prompt('What happened? A human will review this — attendance is not edited automatically.');
+  if (!message) return;
+  try {
+    await api('/api/me/corrections', { method: 'POST', json: { session_id: sessionId, message } });
+    toast('Correction requested. Your teacher will review it.');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+/* --------------------------------------------------------------- staff -- */
+
+function renderStaff(d) {
+  document.getElementById('staff').hidden = false;
+  const sel = document.getElementById('sessionSel');
+  sel.innerHTML = (d.sessions || []).map(s =>
+    `<option value="${s.id}">${esc(s.title)} · ${esc(s.room)} · ${fmtDateTime(s.scheduled_start)}` +
+    `${(d.live_session_ids||[]).includes(s.id) ? '  ● LIVE' : ''}</option>`).join('');
+
+  renderCameras(d.cameras || []);
+  if (d.session) { sel.value = d.session.id; applySession(d); }
+  else { document.getElementById('rollEmpty').hidden = false; }
+}
+
+async function loadSession(id) {
+  if (!id) return;
+  try { applySession(await api('/api/dashboard?session_id=' + id)); }
+  catch (e) { toast(e.message, 'err'); }
+}
+
+function applySession(d) {
+  STATE.sessionId = d.session?.id || null;
+  STATE.records = d.records || [];
+  document.getElementById('rollEmpty').hidden = STATE.records.length > 0;
+
+  const c = d.summary?.counts || {};
+  setStat('s_present', c.present || 0);
+  setStat('s_late',    c.late || 0);
+  setStat('s_absent',  c.absent || 0);
+  setStat('s_review',  d.summary?.needs_review || 0);
+  document.getElementById('rollMeta').textContent =
+    d.summary ? `${d.summary.total} rostered · ${d.summary.attendance_pct}% present` : '';
+
+  renderRoll();
+  renderReview(d.review_queue || []);
+  if (d.cameras) renderCameras(d.cameras);
+  ensureLive();
+}
+
+function pillClass(s) {
+  if (s === 'present') return 'ok';
+  if (s === 'absent' || s === 'needs_review') return 'bad';
+  return 'warn';
+}
+
+function renderRoll() {
+  document.getElementById('roll').innerHTML = STATE.records.map(r => {
+    const cand = STATE.candidates[r.user_id];
+    const pips = cand ? `<span class="pips" title="${cand.frames}/${cand.needed} agreeing frames">` +
+      Array.from({length: cand.needed}, (_, i) =>
+        `<span class="pip ${i < cand.frames ? 'on' : ''}"></span>`).join('') + '</span>' : '';
+    const stamped = r._fresh ? '<span class="stamp fresh">Present</span>' : '';
+    return `
+      <tr id="row-${r.user_id}">
+        <td>${markFor(r.effective_status)}</td>
+        <td>${esc(r.display_name)} ${stamped}</td>
+        <td class="mono">${esc(r.roll_number || '—')}</td>
+        <td class="mono">${fmtTime(r.first_seen)} ${pips}</td>
+        <td class="num">${fmtDuration(r.total_visible_s)}</td>
+        <td class="num">${r.avg_confidence ? r.avg_confidence.toFixed(3) : '—'}</td>
+        <td><span class="pill ${pillClass(r.effective_status)}">${esc(r.effective_status)}</span>
+            ${r.needs_review ? '<span class="pill warn">review</span>' : ''}</td>
+        <td><button class="btn ghost small" onclick="override(${r.id})">Override</button></td>
+      </tr>`;
+  }).join('');
+  // Keyed on row id, so an SSE-driven re-render does not restart the whole roll.
+  revealNew('roll', '#roll tr');
+}
+
+function renderReview(queue) {
+  const host = document.getElementById('review');
+  if (!queue.length) { host.innerHTML = '<div class="empty">Nothing to review.</div>'; return; }
+  host.innerHTML = queue.map(r => `
+    <div style="border-bottom:1px dashed var(--rule);padding:9px 0">
+      <strong>${esc(r.display_name)}</strong>
+      <span class="pill warn">${esc(r.effective_status)}</span>
+      <div class="muted" style="font-size:13px;margin:4px 0 6px">${esc(r.review_reason || '')}</div>
+      <button class="btn small" onclick="override(${r.id},'present')">Mark present</button>
+      <button class="btn ghost small" onclick="override(${r.id},'absent')">Mark absent</button>
+    </div>`).join('');
+}
+
+function renderCameras(cams) {
+  const host = document.getElementById('cams');
+  if (!cams.length) { host.innerHTML = '<div class="empty">No cameras registered.</div>'; return; }
+  host.innerHTML = cams.map(c => `
+    <div class="row" style="justify-content:space-between;border-bottom:1px dashed var(--rule);padding:8px 0">
+      <div>
+        <span class="dot ${c.status}"></span><strong>${esc(c.name)}</strong>
+        <span class="muted"> · ${esc(c.room)} · ${esc(c.mode)}</span>
+        <div class="muted data" style="font-size:11.5px">
+          ${esc(c.status)}${c.measured_fps ? ' · ' + c.measured_fps + ' fps' : ''}
+          ${c.last_heartbeat ? ' · beat ' + fmtTime(c.last_heartbeat) : ''}
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn small ghost" onclick="camera(${c.id},'start')">Start</button>
+        <button class="btn small ghost" onclick="camera(${c.id},'stop')">Stop</button>
+      </div>
+    </div>`).join('');
+}
+
+async function camera(id, action) {
+  try {
+    const r = await api(`/api/cameras/${id}/${action}`, { method: 'POST' });
+    if (action === 'start' && r.antispoof_available === false && r.antispoof_mode === 'strict')
+      toast('Camera refused to start: anti-spoof weights missing (strict mode).', 'err');
+    else toast(`Camera ${action}ed.`);
+    loadSession(STATE.sessionId);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function override(recordId, preset) {
+  const status = preset || prompt('New status (present / late / absent / partial / left_early):');
+  if (!status) return;
+  const reason = prompt('Reason (required — this is written to the audit log):');
+  if (!reason) { toast('An override needs a reason.', 'err'); return; }
+  try {
+    await api('/api/attendance/' + recordId, { method: 'PATCH', json: { status, reason } });
+    toast('Override recorded.');
+    loadSession(STATE.sessionId);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function recompute() {
+  if (!STATE.sessionId) return;
+  try {
+    await api(`/api/sessions/${STATE.sessionId}/recompute`, { method: 'POST' });
+    toast('Recomputed from sightings.');
+    loadSession(STATE.sessionId);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function exportCsv() {
+  if (!STATE.sessionId) return;
+  try {
+    const text = await api('/api/reports/attendance.csv?session_id=' + STATE.sessionId);
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `attendance_session_${STATE.sessionId}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+/* ---------------------------------------------------------------- live -- */
+
+function pushFeed(html) {
+  document.getElementById('feedEmpty').hidden = true;
+  const ul = document.getElementById('feed');
+  ul.insertAdjacentHTML('afterbegin', html);
+  while (ul.children.length > 60) ul.lastElementChild.remove();
+}
+
+/* Idempotent: opens a stream only when the watched session actually changes.
+   Without this guard, `onResync` -> loadSession -> applySession -> connect is an infinite
+   reconnect loop, because every fresh connection immediately emits `hello`. */
+function ensureLive() {
+  if (STATE.es && STATE.esSession === STATE.sessionId) return;
+  if (STATE.es) STATE.es.close();
+  STATE.esSession = STATE.sessionId;
+
+  const state = document.getElementById('liveState');
+  STATE.es = liveStream(STATE.sessionId, {
+    onResync: () => {
+      state.textContent = 'live'; state.className = 'pill ok';
+      // A missed event must never mean a missed record: always re-read the database.
+      // Safe to call now — ensureLive() will no-op for the session already being watched.
+      if (STATE.sessionId) loadSession(STATE.sessionId);
+    },
+    onError: () => { state.textContent = 'reconnecting'; state.className = 'pill warn'; },
+
+    candidate: d => {
+      STATE.candidates[d.user_id] = { frames: d.frames, needed: d.needed };
+      renderRoll();
+      pushFeed(`<li><span class="t">${fmtTime(new Date().toISOString())}</span>
+        <span><span class="muted">verifying…</span> ${d.frames}/${d.needed} frames
+        <span class="muted">${esc(d.detail || '')}</span></span></li>`);
+    },
+    checkin: d => {
+      delete STATE.candidates[d.user_id];
+      const rec = STATE.records.find(r => r.user_id === d.user_id);
+      if (rec) { rec._fresh = true; rec.effective_status = 'present'; rec.first_seen = d.at; }
+      renderRoll();
+      setTimeout(() => { if (rec) { rec._fresh = false; renderRoll(); } }, 2000);
+      pushFeed(`<li><span class="t">${fmtTime(d.at)}</span>
+        <span><span class="who">${esc(d.display_name)}</span>
+        <span class="stamp fresh">Present</span>
+        <span class="muted data"> conf ${(d.confidence||0).toFixed(3)} · ${d.frames} frames
+        · occl ${(d.occluded_ratio||0).toFixed(2)}${d.unscheduled ? ' · UNSCHEDULED' : ''}</span></span></li>`);
+      if (STATE.sessionId) loadSession(STATE.sessionId);
+    },
+    unknown_face: d => pushFeed(`<li><span class="t">${fmtTime(d.at)}</span>
+      <span class="oxide">Unknown face</span>
+      <span class="muted data">best ${(d.best_score||0).toFixed(3)} — never auto-assigned</span></li>`),
+    ambiguous: d => pushFeed(`<li><span class="t">${fmtTime(d.at)}</span>
+      <span class="amber">Ambiguous</span><span class="muted">${esc(d.reason || '')}</span></li>`),
+    spoof_suspected: d => pushFeed(`<li><span class="t">${fmtTime(d.at)}</span>
+      <span class="oxide">Spoof suspected</span><span class="muted">${esc(d.reason || '')}</span></li>`),
+    camera_status: d => {
+      pushFeed(`<li><span class="t">${fmtTime(d.at)}</span>
+        <span>Camera <strong>${esc(d.name || d.camera_id)}</strong>
+        <span class="pill ${d.status === 'running' ? 'ok' : 'bad'}">${esc(d.status)}</span></span></li>`);
+      loadSession(STATE.sessionId);
+    },
+    record_overridden: () => loadSession(STATE.sessionId)
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

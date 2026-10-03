@@ -1,0 +1,121 @@
+# Single source of truth for all pipeline knobs.
+# Override per-run with: load_config("my_config.yaml")
+#
+# Blocks `device` .. `engine` are the upstream occlubio config, preserved verbatim except where
+# a comment says otherwise. The `attendance:` block at the bottom is added by this project.
+# Nothing in occlubio/ is edited — behaviour is changed HERE or in app/.
+
+device:
+  ctx_id: 0                       # GPU id; set -1 to force CPU
+  providers:                      # onnxruntime providers (order = priority)
+    - CUDAExecutionProvider
+    - CPUExecutionProvider
+
+detection:
+  model_name: buffalo_l           # buffalo_l (accurate) | buffalo_sc (light, edge) | buffalo_s
+  det_size: [640, 640]            # detector input; smaller = faster, misses small faces
+                                  # MEASURED on this box (AMD Ryzen, CPU-only, tools/bench_cpu.py):
+                                  #   640x640 -> 160 ms   480x480 -> 88 ms   320x320 -> 38 ms
+                                  # Kept at 640 for small/distant faces. For a close-range door
+                                  # kiosk, 480 is ~1.8x faster and loses little.
+  score_thresh: 0.5
+  min_face: 24                    # ignore faces smaller than this (px, longer side)
+
+recognition:
+  embedding_dim: 512
+  custom_onnx: null               # path to YOUR trained occlusion-aware model (see training/)
+                                  # when set, detection runs detection-only and this model embeds.
+
+quality:                          # FIQA gate (proxy for CR-FIQA; see quality.py HOOK)
+  enabled: true
+  min_score: 0.35                 # [0,1]; frames below this are not recognized
+  blur_min: 40.0                  # variance-of-Laplacian floor (sharpness)
+  brightness_min: 30
+  brightness_max: 225
+
+occlusion:                        # occlusion-type estimate (heuristic; HOOK for trained head)
+  enabled: true
+
+antispoof:                        # passive RGB PAD (disabled until you supply a model)
+  enabled: false                  # <- SEE attendance.antispoof_mode. With no weights, AntiSpoof
+  onnx_path: null                 #    .check() returns live=True for EVERYTHING, including a
+  input_size: [80, 80]            #    phone screen held up to the camera.
+  min_score: 0.5
+
+tracking:
+  enabled: true
+  iou_thresh: 0.25                # lower = holds IDs better on moving faces / strided frames
+  max_age: 30                     # frames a track survives without a detection
+  min_hits: 2                     # detections before a track is "confirmed"
+
+analytics:                        # video report consolidation (reduces fragmented "unknown" noise)
+  min_track_frames: 3             # drop tracks seen fewer than this many processed frames
+  merge_gap_s: 1.5                # merge a person's appearances separated by less than this gap
+  unknown_min_seconds: 0.6        # ignore unknown blips shorter than this
+  unknown_merge_sim: 0.45         # cosine sim to merge unknown tracks into ONE unknown person
+
+gallery:
+  path: gallery_store
+  metric: cosine
+  match_threshold: 0.45           # cosine-sim threshold to call a track "known"
+  top_k: 5
+  per_track_buffer: 8             # set-based recognition: avg embeddings over N best frames
+
+  # --- ADDED by this project (referenced by the build spec, absent upstream) ---------------
+  # !! UNVALIDATED PLACEHOLDERS !!  These are the spec's starting points, NOT values derived
+  # from a ROC curve on real faces. Run `tools/roc.py` against your own enrolled identities and
+  # replace all three, recording the FAR each was chosen at. Until then this system's accuracy
+  # claims are unsupported. See README "Thresholds are not yet validated".
+  review_threshold: 0.32          # band [review, match) -> CANDIDATE / needs_review, never auto-marked
+  dup_threshold: 0.60             # enrollment refuses (HTTP 409) above this against the gallery
+  min_enroll_images: 5            # minimum accepted samples per identity
+
+engine:
+  draw: true                      # draw overlays in video mode
+
+# =============================================================================================
+# attendance: — added by this project. Zero magic numbers live in app/ code; they all live here.
+# =============================================================================================
+attendance:
+  timezone: Asia/Kolkata          # rendering only — every timestamp is STORED in UTC
+  setting: college                # college | school | office | factory  (labels only)
+
+  # ---- worker loop ----------------------------------------------------------------------
+  detect_every_n_frames: 3        # MEASURED: stride 1 -> 4.4 FPS, stride 3 -> 8.4 FPS,
+                                  # stride 5 -> 10.2 FPS (det 640 + one 66 ms embedding).
+                                  # Raising this past ~5 buys little: embedding then dominates.
+  max_faces_per_frame: 8          # hard cap; each extra face costs a full 66 ms embedding
+  frame_grab_timeout_s: 5.0       # no frame within this -> treat stream as dropped
+  reconnect_backoff_s: [1, 2, 5, 10, 30]   # capped exponential backoff on stream loss
+  heartbeat_interval_s: 10        # worker -> DB liveness ping
+  camera_offline_after_s: 30      # no heartbeat within this -> dashboard shows OFFLINE
+  event_buffer_path: var/event_buffer    # disk spool used when the DB/bus is unavailable
+
+  # ---- confirmation state machine -------------------------------------------------------
+  confirm_frames: 5               # agreeing frames required before anyone is marked present.
+                                  # At ~8 FPS processed this is ~0.6 s of evidence.
+  confirm_window_s: 6.0           # those frames must fall inside this window
+  min_distinct_windows: 2         # B9: appearances must span >= this many separate windows ...
+  min_span_seconds: 1.5           # ... covering >= this long, so a briefly-held photo cannot confirm
+  ambiguous_flip_limit: 2         # identity changes within a track before -> AMBIGUOUS
+  heavy_occlusion_ratio: 0.6      # a record whose every frame is occluded above this -> needs_review
+  recheck_cooldown_s: 300         # after a confirmed check-in, ignore this user for 5 min
+  unknown_after_s: 3.0            # sub-review_threshold for this long -> unknown sighting + alert
+  track_idle_timeout_s: 4.0       # no detection for this long -> close the track
+
+  # ---- session resolution ---------------------------------------------------------------
+  early_checkin_minutes: 15       # a check-in this far before scheduled_start still counts
+  late_checkin_minutes: 10        # ... and this far after scheduled_end
+  grace_minutes: 10               # after scheduled_start + grace -> `late`
+  min_presence_seconds: 1500      # room mode: visible this long -> `present` (25 min of a 50 min class)
+
+  # ---- policy ---------------------------------------------------------------------------
+  minimum_attendance_pct: 75      # reporting threshold for the term
+  antispoof_mode: strict          # strict  -> REFUSE to start a live worker without PAD weights
+                                  # permissive -> start, but banner everywhere. See PRIVACY.md.
+  default_camera_mode: kiosk      # kiosk | room
+
+  # ---- privacy / retention --------------------------------------------------------------
+  retention_days: 30              # crops + recorded frames deleted after this; attendance survives
+  store_thumbnails: true          # set false to keep no imagery at all
+  require_consent: true           # enrollment is refused without an explicit consent tick

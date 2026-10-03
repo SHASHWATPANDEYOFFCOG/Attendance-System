@@ -99,6 +99,36 @@ export async function apiGetAll<T extends Record<string, string>>(
   return Object.fromEntries(results) as { [K in keyof T]: unknown | null };
 }
 
+export type Me = {
+  id: number;
+  username: string;
+  display_name: string;
+  role: "super_admin" | "admin" | "faculty" | "student" | "parent";
+  roll_number: string | null;
+  email: string | null;
+  phone: string | null;
+  consent_given: boolean;
+  has_biometrics: boolean;
+  department_id: number | null;
+  student_status: "pending" | "approved" | "rejected" | null;
+  rejection_reason: string | null;
+  email_verified: boolean;
+};
+
+export const STAFF_ROLES = ["faculty", "admin", "super_admin"] as const;
+export const isStaffRole = (role?: string | null) =>
+  (STAFF_ROLES as readonly string[]).includes(role ?? "");
+export const isAdminRole = (role?: string | null) => role === "admin" || role === "super_admin";
+
+/** The signed-in user, or null when the session is missing or rejected. */
+export async function getMe(): Promise<Me | null> {
+  try {
+    return await apiGet<Me>("/api/me");
+  } catch {
+    return null;
+  }
+}
+
 export async function isSignedIn(): Promise<boolean> {
   const store = await cookies();
   return Boolean(store.get(ACCESS_COOKIE)?.value);

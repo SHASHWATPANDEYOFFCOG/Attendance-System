@@ -19,7 +19,6 @@ import {
 } from "@/lib/types";
 import { TrendChart, WeekdayHeatmap } from "@/components/charts";
 import { Banner, Card, CardHeader, Empty, Pill, StatTile } from "@/components/ui";
-import { LogoutButton, ThemeToggle } from "@/components/controls";
 
 export const dynamic = "force-dynamic";
 
@@ -60,8 +59,6 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <LogoutButton />
         </div>
       </header>
 

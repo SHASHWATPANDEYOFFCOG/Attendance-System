@@ -7,7 +7,8 @@
  */
 import { NextResponse } from "next/server";
 
-import { ACCESS_COOKIE, API_BASE, REFRESH_COOKIE } from "@/lib/api";
+import { API_BASE } from "@/lib/api";
+import { homeFor, setSessionCookies } from "@/lib/session";
 
 export async function POST(request: Request) {
   let payload: { username?: string; password?: string };
@@ -19,44 +20,50 @@ export async function POST(request: Request) {
 
   const { username, password } = payload;
   if (!username || !password) {
-    return NextResponse.json({ error: "username and password are required" }, { status: 400 });
+    return NextResponse.json({ error: "Enter your username, email or roll number and password." }, { status: 400 });
   }
 
-  const upstream = await fetch(`${API_BASE}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-    cache: "no-store",
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Forwarded-For": request.headers.get("x-forwarded-for") ?? "",
+      },
+      body: JSON.stringify({ username, password }),
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json({ error: "The attendance server is unreachable." }, { status: 502 });
+  }
 
   if (!upstream.ok) {
-    // Deliberately not forwarding the upstream message verbatim: "no such user" versus
-    // "wrong password" is a username-enumeration oracle.
-    return NextResponse.json({ error: "invalid username or password" }, { status: 401 });
+    // Wrong user and wrong password stay indistinguishable ("no such user" vs "wrong password"
+    // is a username-enumeration oracle). Lockout, rate limiting and an unverified email are
+    // about an account the person has already proven they own, so those are passed through.
+    const body = await upstream.json().catch(() => ({}));
+    const detail = body?.detail;
+    if (upstream.status === 429) {
+      return NextResponse.json({ error: typeof detail === "string" ? detail : "Too many attempts." }, {
+        status: 429,
+      });
+    }
+    if (upstream.status === 403 && detail && typeof detail === "object") {
+      return NextResponse.json({ error: detail.message, code: detail.code, email: detail.email }, {
+        status: 403,
+      });
+    }
+    return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 
   const body = await upstream.json();
   const res = NextResponse.json({
     role: body.role,
     display_name: body.display_name,
+    student_status: body.student_status ?? null,
+    home: homeFor(body.role),
   });
-
-  const secure = process.env.NODE_ENV === "production";
-  res.cookies.set(ACCESS_COOKIE, body.access_token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure,
-    path: "/",
-    maxAge: 60 * 30,
-  });
-  if (body.refresh_token) {
-    res.cookies.set(REFRESH_COOKIE, body.refresh_token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-  }
+  setSessionCookies(res, body);
   return res;
 }

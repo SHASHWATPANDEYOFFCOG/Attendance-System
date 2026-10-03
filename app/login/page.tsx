@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useState } from "react";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 /**
@@ -37,13 +38,18 @@ function LoginForm() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        if (body.code === "email_unverified") {
+          router.push(`/verify-email?email=${encodeURIComponent(body.email ?? username)}`);
+          return;
+        }
         setError(body.error ?? "Sign in failed");
         return;
       }
-      const { role } = (await res.json().catch(() => ({}))) as { role?: string };
-      // Students and parents have no staff dashboard to land on.
-      const home = role === "student" || role === "parent" ? "/my-attendance" : "/dashboard";
-      router.push(params.get("next") || home);
+      const { home } = (await res.json().catch(() => ({}))) as { home?: string };
+      // Only follow ?next= to a path on this site — never an absolute URL (open redirect).
+      const next = params.get("next");
+      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+      router.push(safeNext || home || "/");
       router.refresh();
     } catch {
       setError("Could not reach the server.");
@@ -73,7 +79,7 @@ function LoginForm() {
 
           <div className="mb-3.5">
             <label className="label block" htmlFor="username">
-              Username or roll number
+              Username, email or roll number
             </label>
             <input
               id="username"
@@ -110,6 +116,14 @@ function LoginForm() {
           >
             {busy ? "Signing in..." : "Sign in"}
           </button>
+          <div className="mt-4 flex flex-wrap justify-between gap-2 text-[13.5px]">
+            <Link href="/forgot-password" className="text-ink underline-offset-2 hover:underline">
+              Forgot password?
+            </Link>
+            <Link href="/signup" className="text-ink underline-offset-2 hover:underline">
+              New student? Register
+            </Link>
+          </div>
       </form>
     </LoginShell>
   );

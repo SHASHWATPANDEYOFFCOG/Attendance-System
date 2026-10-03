@@ -11,7 +11,6 @@ import Link from "next/link";
 
 import { apiGet } from "@/lib/api";
 import { Banner, Card, CardHeader, Empty, Mark, Pill } from "@/components/ui";
-import { LogoutButton, ThemeToggle } from "@/components/controls";
 
 export const dynamic = "force-dynamic";
 
@@ -95,8 +94,6 @@ export default async function ReportsPage({
           >
             Dashboard
           </Link>
-          <ThemeToggle />
-          <LogoutButton />
         </div>
       </header>
 

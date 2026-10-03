@@ -134,13 +134,18 @@ def _classes_needed(present: int, counted: int, threshold: float) -> int:
 
     Solving (present + n) / (counted + n) >= t  ->  n >= (t*counted - present) / (1 - t).
     """
-    t = threshold / 100.0
-    if counted and (present / counted) >= t:
-        return 0
-    if t >= 1.0:
-        return -1                                   # unreachable
+    # Exact rational arithmetic: in floats 1 - 0.8 is 0.19999999999999996, which turns an exact
+    # 15 into 15.000000000000004 and the ceiling into 16 -- one class too many, on the screen
+    # students act on.
+    from fractions import Fraction
     import math
-    return max(0, math.ceil((t * counted - present) / (1.0 - t)))
+
+    t = Fraction(str(threshold)) / 100
+    if counted and Fraction(present, counted) >= t:
+        return 0
+    if t >= 1:
+        return -1                                   # unreachable
+    return max(0, math.ceil((t * counted - present) / (1 - t)))
 
 
 def can_miss(present: int, counted: int, remaining: int, threshold: float = 75.0) -> dict:
@@ -380,7 +385,9 @@ def attendance_calendar(db: Session, user_id: int, *, days: int = 60) -> List[di
         elif any(s == AttendanceStatus.LATE.value for s in statuses):
             worst = AttendanceStatus.LATE.value
         elif all(s in EXCLUDED_FROM_TOTAL for s in statuses):
-            worst = AttendanceStatus.EXCUSED.value
+            worst = (AttendanceStatus.ON_LEAVE.value
+                     if any(s == AttendanceStatus.ON_LEAVE.value for s in statuses)
+                     else AttendanceStatus.EXCUSED.value)
         else:
             worst = AttendanceStatus.PRESENT.value
         out.append({"date": day, "status": worst, "periods": len(statuses),

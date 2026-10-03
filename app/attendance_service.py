@@ -107,14 +107,22 @@ def recompute_session(db: Session, session: ClassSession, cfg,
                             .where(AttendanceRecordRow.session_id == session.id))
     }
     overrides = {
-        uid: (r.overridden_status, r.override_reason, r.overridden_by_id, r.overridden_at)
+        uid: (r.overridden_status, r.override_reason, r.overridden_by_id, r.overridden_at,
+              r.leave_request_id)
         for uid, r in existing.items() if r.overridden_status
     }
+    # Records that are not derived from sightings (a CCTV confirmation, a selfie, a QR scan, a
+    # teacher's mark, a close-time fill) ARE the evidence. Rebuilding must never erase them.
+    kept = {uid: r for uid, r in existing.items() if r.source != CaptureMethod.FACE.value}
 
-    db.execute(delete(AttendanceRecordRow).where(AttendanceRecordRow.session_id == session.id))
+    db.execute(delete(AttendanceRecordRow).where(
+        AttendanceRecordRow.session_id == session.id,
+        AttendanceRecordRow.source == CaptureMethod.FACE.value))
 
-    out: List[AttendanceRecordRow] = []
+    out: List[AttendanceRecordRow] = list(kept.values())
     for rec in computed:
+        if rec.user_id in kept:
+            continue
         row = AttendanceRecordRow(
             session_id=session.id,
             user_id=rec.user_id,
@@ -130,9 +138,10 @@ def recompute_session(db: Session, session: ClassSession, cfg,
             computed_at=utcnow(),
         )
         if rec.user_id in overrides:
-            status_, reason, by_id, at = overrides[rec.user_id]
+            status_, reason, by_id, at, leave_id = overrides[rec.user_id]
             row.overridden_status, row.override_reason = status_, reason
             row.overridden_by_id, row.overridden_at = by_id, at
+            row.leave_request_id = leave_id
         db.add(row)
         out.append(row)
 

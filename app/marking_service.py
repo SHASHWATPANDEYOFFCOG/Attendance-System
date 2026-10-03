@@ -47,7 +47,12 @@ MARKABLE = {
     AttendanceStatus.LATE.value,
     AttendanceStatus.ON_DUTY.value,
     AttendanceStatus.EXCUSED.value,
+    AttendanceStatus.ON_LEAVE.value,
 }
+
+#: Rows the system filled in when a session closed. Marking over them is the teacher's first
+#: decision about that student, not a change of someone else's, so no reason is demanded.
+_SYSTEM_FILLED = {CaptureMethod.SYSTEM.value}
 
 
 class MarkingError(Exception):
@@ -69,6 +74,7 @@ def section_student_ids(db: Session, section_id: int) -> List[int]:
         select(StudentProfile.user_id)
         .join(User, User.id == StudentProfile.user_id)
         .where(StudentProfile.section_id == section_id)
+        .where(StudentProfile.status == "approved")      # pending/rejected are never rostered
         .where(User.deleted_at.is_(None))
         .where(User.is_active.is_(True))
     )
@@ -86,6 +92,14 @@ def open_session(db: Session, slot: TimetableSlot, on: date, actor: User, cfg) -
             f"this period is scheduled on {days[slot.day_of_week]}, but "
             f"{on.isoformat()} is a {days[on.weekday()]}",
         )
+
+    # No lecture is held on a holiday, for the whole college or this section's branch.
+    from app.routes.academic import is_holiday
+
+    sec = db.get(Section, slot.section_id)
+    holiday = is_holiday(db, on, sec.program.department_id if sec and sec.program else None)
+    if holiday:
+        raise MarkingError(409, f"{on.isoformat()} is a holiday ({holiday}); no session is held.")
 
     tz_offset = int(getattr(cfg.attendance, "tz_offset_minutes", 330))
     starts = local_to_utc(on, slot.start_minute, tz_offset)
@@ -201,8 +215,13 @@ def roster_view(db: Session, session: ClassSession) -> dict:
 
 
 def save_marks(db: Session, session: ClassSession, marks: Sequence[dict], actor: User,
-               cfg) -> dict:
-    """Upsert every mark in one transaction. All of it lands, or none of it does."""
+               cfg, reason: Optional[str] = None) -> dict:
+    """Upsert every mark in one transaction. All of it lands, or none of it does.
+
+    Changing a status that is already recorded needs a reason (per mark, or one `reason` for
+    the batch). Each change is written to the audit log with who, when, old value, new value
+    and why, and the student is told.
+    """
     if session.is_locked:
         raise MarkingError(409, "this session is locked; raise a correction request instead")
 
@@ -210,6 +229,7 @@ def save_marks(db: Session, session: ClassSession, marks: Sequence[dict], actor:
         select(RosterEntry.user_id).where(RosterEntry.session_id == session.id)))
 
     cleaned: dict[int, str] = {}
+    reasons: dict[int, str] = {}
     unknown: list[int] = []
     for m in marks:
         uid, status = int(m["user_id"]), str(m["status"])
@@ -220,6 +240,9 @@ def save_marks(db: Session, session: ClassSession, marks: Sequence[dict], actor:
             unknown.append(uid)          # reported, not silently applied
             continue
         cleaned[uid] = status
+        why = (m.get("reason") or reason or "").strip()
+        if why:
+            reasons[uid] = why[:300]
 
     existing = {
         r.user_id: r
@@ -227,8 +250,22 @@ def save_marks(db: Session, session: ClassSession, marks: Sequence[dict], actor:
             select(AttendanceRecordRow).where(AttendanceRecordRow.session_id == session.id))
     }
 
+    # Every change of an already-recorded status needs a reason. Checked up front, so a
+    # missing reason refuses the whole batch rather than half of it.
+    needs_reason = [
+        uid for uid, status in cleaned.items()
+        if uid in existing and existing[uid].effective_status != status
+        and existing[uid].source not in _SYSTEM_FILLED and len(reasons.get(uid, "")) < 3
+    ]
+    if needs_reason:
+        raise MarkingError(
+            422, f"A reason is required to change {len(needs_reason)} recorded status(es).",
+            needs_reason=needs_reason)
+
     created = updated = unchanged = 0
     changes: list[str] = []
+    changed_rows: list[tuple[int, str, str]] = []
+    created_ids: list[int] = []
     now = utcnow()
 
     try:
@@ -241,26 +278,39 @@ def save_marks(db: Session, session: ClassSession, marks: Sequence[dict], actor:
                     last_seen=session.scheduled_end if status != "absent" else None,
                     total_visible_s=0.0, avg_confidence=0.0, frames_matched=0,
                     source=CaptureMethod.MANUAL.value, computed_at=now,
+                    marked_by_id=actor.id, marked_at=now,
                 ))
                 created += 1
+                created_ids.append(uid)
                 continue
 
             before = row.effective_status
             if before == status:
                 unchanged += 1
                 continue
-            # A manual mark on a face-captured session is an OVERRIDE: the derived value and the
-            # human decision are both preserved, and the override survives recompute.
-            if row.source == CaptureMethod.FACE.value:
+            why = reasons.get(uid) or "first manual marking after the automatic close"
+            if row.source == CaptureMethod.MANUAL.value or row.source in _SYSTEM_FILLED:
+                row.status = status
+                row.source = CaptureMethod.MANUAL.value
+            else:
+                # A manual mark over captured evidence (face, CCTV, selfie, QR) is an OVERRIDE:
+                # the captured value and the human decision are both preserved, and the
+                # override survives recompute.
                 row.overridden_status = status
                 row.overridden_by_id = actor.id
                 row.overridden_at = now
-                row.override_reason = "marked by hand on the marking screen"
-            else:
-                row.status = status
+                row.override_reason = why
+            row.marked_by_id = actor.id
+            row.marked_at = now
+            row.needs_review = False
             row.computed_at = now
             updated += 1
             changes.append(f"{uid}:{before}->{status}")
+            changed_rows.append((uid, before, status))
+            db.add(AuditLog(actor_id=actor.id, action="attendance_changed",
+                            target_type="attendance_record", target_id=str(row.id),
+                            reason=why, detail=f"session={session.id} user={uid} "
+                                               f"{before} -> {status}"))
 
         session.marked_by_id = actor.id
         session.marked_at = now
@@ -273,6 +323,23 @@ def save_marks(db: Session, session: ClassSession, marks: Sequence[dict], actor:
             detail=f"created={created} updated={updated} unchanged={unchanged} "
                    f"changes=[{'; '.join(changes[:40])}]",
         ))
+        from app.notify import notify
+
+        subj = db.get(Subject, session.subject_id) if session.subject_id else None
+        label = subj.code if subj else session.title
+        for uid, before, status in changed_rows:
+            stated = reasons.get(uid)
+            notify(db, [uid], "attendance_changed", "Attendance changed by your teacher",
+                   f"{label}: {before.replace('_', ' ')} → {status.replace('_', ' ')}. "
+                   f"Reason: {stated or 'first marking after the session closed'}.",
+                   link="/student/history", email=bool(stated))
+        by_status: dict[str, list[int]] = {}
+        for uid in created_ids:
+            by_status.setdefault(cleaned[uid], []).append(uid)
+        for status, uids in by_status.items():
+            notify(db, uids, "attendance_marked", f"Attendance marked: {status.replace('_', ' ')}",
+                   f"{label}: marked {status.replace('_', ' ')} by {actor.display_name}.",
+                   link="/student/history")
         db.commit()
     except Exception:
         db.rollback()

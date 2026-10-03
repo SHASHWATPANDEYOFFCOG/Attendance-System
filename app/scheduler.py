@@ -89,4 +89,12 @@ def _dispatch_emails(db) -> None:
     dispatch_emails(db, public_base_url(), str(settings_service.get(db, cfg, "org_name")))
 
 
+def _sessions(db) -> None:
+    from app.runtime import cfg
+    from app.session_service import tick
+
+    tick(db, cfg)
+
+
 scheduler.add("email", 5.0, _dispatch_emails)
+scheduler.add("sessions", 30.0, _sessions)

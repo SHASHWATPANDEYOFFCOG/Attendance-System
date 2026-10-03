@@ -233,7 +233,8 @@ def test_resaving_updates_rather_than_duplicates(api, klass):
 
     second = [{"user_id": u, "status": "present"} for u in klass["students"]]
     second[0]["status"] = "late"
-    r = api.post(f"/api/attendance/sessions/{sid}/records", json={"marks": second},
+    r = api.post(f"/api/attendance/sessions/{sid}/records",
+                 json={"marks": second, "reason": "arrived after roll call"},
                  headers=klass["prof_h"]).json()
     assert r["created"] == 0 and r["updated"] == 1 and r["unchanged"] == 3
 
@@ -393,7 +394,8 @@ def test_a_manual_mark_on_a_face_session_becomes_an_override(api, klass):
         db.close()
 
     api.post(f"/api/attendance/sessions/{sid}/records",
-             json={"marks": [{"user_id": uid, "status": "present"}]},
+             json={"marks": [{"user_id": uid, "status": "present",
+                              "reason": "seen in class; camera missed them"}]},
              headers=klass["prof_h"])
 
     db = SessionLocal()

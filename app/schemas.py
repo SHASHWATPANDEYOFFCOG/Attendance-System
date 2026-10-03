@@ -22,6 +22,8 @@ class OpenSessionIn(BaseModel):
 class MarkIn(BaseModel):
     user_id: int
     status: str
+    #: Required when this changes a status that is already recorded.
+    reason: Optional[str] = Field(None, max_length=300)
 
 
 class MarkBatchIn(BaseModel):
@@ -29,6 +31,8 @@ class MarkBatchIn(BaseModel):
     dropped connection cannot leave half the class marked."""
 
     marks: List[MarkIn] = Field(min_length=1, max_length=500)
+    #: One reason for every change in this save (a per-mark reason wins).
+    reason: Optional[str] = Field(None, max_length=300)
 
 
 class RefreshIn(BaseModel):

@@ -651,7 +651,8 @@ def save_marking(session_id: int, body: MarkBatchIn, db: Session = Depends(get_d
     s = _get_session_or_404(db, session_id)
     assert_can_mark_session(actor, s)
     try:
-        result = marking.save_marks(db, s, [m.model_dump() for m in body.marks], actor, cfg)
+        result = marking.save_marks(db, s, [m.model_dump() for m in body.marks], actor, cfg,
+                                    reason=body.reason)
     except marking.MarkingError as exc:
         raise HTTPException(exc.code, detail={"message": exc.message, **exc.extra})
 
@@ -669,24 +670,29 @@ def override_record(record_id: int, body: OverrideIn, db: Session = Depends(get_
         raise HTTPException(404, "record not found")
     s = _get_session_or_404(db, row.session_id)
     assert_owns_session(actor, s)
-    try:
-        new_status = Status(body.status)
-    except ValueError:
+    if body.status not in marking.MARKABLE:
         raise HTTPException(400, f"unknown status: {body.status}")
 
+    new_status = body.status
     before = row.effective_status
-    row.overridden_status = new_status.value
+    row.overridden_status = new_status
     row.override_reason = body.reason
     row.overridden_by_id = actor.id
     row.overridden_at = utcnow()
     row.needs_review = False
     db.add(AuditLog(actor_id=actor.id, action="attendance_override",
                     target_type="attendance_record", target_id=str(record_id),
-                    reason=body.reason, detail=f"{before} -> {new_status.value}"))
+                    reason=body.reason, detail=f"{before} -> {new_status}"))
+    if before != new_status:
+        from app.notify import notify
+
+        notify(db, [row.user_id], "attendance_changed", "Attendance changed by your teacher",
+               f"{s.title}: {before.replace('_', ' ')} to {new_status.replace('_', ' ')}. "
+               f"Reason: {body.reason}.", link="/student/history", email=True)
     db.commit()
 
     emit("record_overridden", {"record_id": record_id, "user_id": row.user_id,
-                               "status": new_status.value, "by": actor.display_name,
+                               "status": new_status, "by": actor.display_name,
                                "reason": body.reason},
          session_id=row.session_id, threadsafe=False)
     return _record_dict(row, db.get(User, row.user_id))
@@ -1221,9 +1227,11 @@ from app.routes import academic as _academic  # noqa: E402
 from app.routes import accounts as _accounts  # noqa: E402
 from app.routes import admin as _admin  # noqa: E402
 from app.routes import files as _files  # noqa: E402
+from app.routes import sessions as _sessions  # noqa: E402
 from app.routes import students as _students  # noqa: E402
 
-for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router):
+for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
+           _sessions.router):
     app.include_router(_r)
 
 

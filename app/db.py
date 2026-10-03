@@ -40,8 +40,14 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def init_db() -> None:
-    """Create tables. Idempotent."""
-    Base.metadata.create_all(engine)
+    """Create missing tables, then add missing columns and indexes. Idempotent.
+
+    Running the additive migrator here (not just `create_all`) means an existing database picks
+    up new columns on the next start instead of failing at query time.
+    """
+    from app.migrate import migrate
+
+    migrate(engine)
 
 
 def get_db() -> Iterator[Session]:

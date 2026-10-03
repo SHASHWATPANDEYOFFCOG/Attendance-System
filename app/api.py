@@ -134,11 +134,23 @@ app = FastAPI(title="Occlusion-Robust Attendance", version="0.1.0", lifespan=lif
 # ------------------------------------------------------------------ helpers
 
 def _user_out(u: User) -> UserOut:
+    from sqlalchemy.orm import object_session
+
+    from app.models import StudentProfile
+
+    prof = None
+    sess = object_session(u)
+    if sess is not None:
+        prof = sess.scalars(select(StudentProfile).where(StudentProfile.user_id == u.id)).first()
     return UserOut(
         id=u.id, username=u.username, display_name=u.display_name,
         role=u.role.value if isinstance(u.role, Role) else str(u.role),
         roll_number=u.roll_number, email=u.email,
         consent_given=u.consent_given, has_biometrics=u.has_biometrics,
+        phone=u.phone, department_id=u.department_id,
+        student_status=prof.status if prof else None,
+        rejection_reason=prof.rejection_reason if prof else None,
+        email_verified=u.email_verified_at is not None,
     )
 
 
@@ -192,18 +204,83 @@ def _get_session_or_404(db: Session, session_id: int) -> ClassSession:
 
 # --------------------------------------------------------------------- auth
 
+MAX_FAILED_LOGINS = 5
+LOCKOUT = timedelta(minutes=15)
+
+
+def _find_login_user(db: Session, identifier: str) -> Optional[User]:
+    """Username, email or roll number — whichever the person remembers."""
+    ident = identifier.strip()
+    if not ident:
+        return None
+    return db.scalars(
+        select(User).where(or_(
+            User.username == ident,
+            func.lower(User.email) == ident.lower(),
+            User.roll_number == ident,
+        )).where(User.deleted_at.is_(None))
+    ).first()
+
+
+def _student_status(db: Session, user: User) -> Optional[str]:
+    from app.models import StudentProfile
+
+    prof = db.scalars(select(StudentProfile).where(StudentProfile.user_id == user.id)).first()
+    return prof.status if prof is not None else None
+
+
 @app.post("/api/auth/login", response_model=TokenOut)
-def login(body: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalars(select(User).where(User.username == body.username)).first()
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    from app.crypto import needs_rehash
+    from app.ratelimit import client_ip, enforce
+
+    enforce(request, "login")
+    user = _find_login_user(db, body.username)
+    now = utcnow()
+
+    if user is not None and user.locked_until is not None and user.locked_until > now:
+        mins = max(1, int((user.locked_until - now).total_seconds() // 60) + 1)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
+            "code": "locked",
+            "message": f"Too many failed sign-ins. This account is locked for {mins} more "
+                       f"minute(s).",
+        })
+
     if user is None or not verify_password(body.password, user.password_hash):
+        if user is not None:
+            user.failed_logins = (user.failed_logins or 0) + 1
+            if user.failed_logins >= MAX_FAILED_LOGINS:
+                user.locked_until = now + LOCKOUT
+                user.failed_logins = 0
+                db.add(AuditLog(actor_id=user.id, action="account_locked", target_type="user",
+                                target_id=str(user.id), ip=client_ip(request),
+                                detail=f"{MAX_FAILED_LOGINS} failed sign-ins"))
+            db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid username or password")
     if not user.is_active:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "account disabled")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
+            "code": "disabled", "message": "This account has been disabled."})
+
+    student_status = _student_status(db, user)
+    if student_status == "pending" and user.email_verified_at is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
+            "code": "email_unverified",
+            "message": "Verify your email address before signing in.",
+            "email": user.email,
+        })
+
+    user.failed_logins = 0
+    user.locked_until = None
+    user.last_login_at = now
+    if needs_rehash(user.password_hash):
+        user.password_hash = hash_password(body.password)   # silent upgrade to argon2id
+    db.commit()
     return TokenOut(
         access_token=create_token(user, "access"),
         refresh_token=create_token(user, "refresh"),
         role=user.role.value if isinstance(user.role, Role) else str(user.role),
         user_id=user.id, display_name=user.display_name,
+        student_status=student_status,
     )
 
 
@@ -211,12 +288,17 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 def refresh(body: RefreshIn, db: Session = Depends(get_db)):
     payload = decode_token(body.refresh_token, expect="refresh")
     user = db.get(User, int(payload["sub"]))
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.deleted_at is not None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user not found")
+    # A password change after this refresh token was minted revokes it.
+    changed = user.password_changed_at
+    if changed is not None and int(payload.get("iat", 0)) < int(changed.timestamp()):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "session expired; sign in again")
     return TokenOut(
         access_token=create_token(user, "access"),
         role=user.role.value if isinstance(user.role, Role) else str(user.role),
         user_id=user.id, display_name=user.display_name,
+        student_status=_student_status(db, user),
     )
 
 

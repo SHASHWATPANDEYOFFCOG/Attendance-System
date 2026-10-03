@@ -65,9 +65,14 @@ def api(monkeypatch):
     from app.models import Base
     import app.gallery_service as gs
 
+    import app.settings_service as settings_service
+    from app.ratelimit import limiter
+
     monkeypatch.setattr(ps, "_instance", StubPipeline())
     monkeypatch.setattr("app.api.get_pipeline", lambda _cfg: StubPipeline())
     gs.invalidate()
+    settings_service.invalidate()       # cached settings belong to the previous test's database
+    limiter.reset()
 
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

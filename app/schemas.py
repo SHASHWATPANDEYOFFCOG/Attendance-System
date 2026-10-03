@@ -42,6 +42,8 @@ class TokenOut(BaseModel):
     role: str
     user_id: int
     display_name: str
+    #: pending | approved | rejected for students; None for staff. Drives the post-login route.
+    student_status: Optional[str] = None
 
 
 class RegisterIn(BaseModel):
@@ -70,6 +72,11 @@ class UserOut(BaseModel):
     email: Optional[str] = None
     consent_given: bool
     has_biometrics: bool
+    phone: Optional[str] = None
+    department_id: Optional[int] = None
+    student_status: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    email_verified: bool = False
 
 
 class CameraIn(BaseModel):

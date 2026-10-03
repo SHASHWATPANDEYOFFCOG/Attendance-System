@@ -114,7 +114,8 @@ class AttendanceStatus(str, enum.Enum):
     PARTIAL = "partial"
     LEFT_EARLY = "left_early"
     ON_DUTY = "on_duty"
-    EXCUSED = "excused"          # approved leave -- excluded from the percentage denominator
+    EXCUSED = "excused"          # excused by a teacher -- excluded from the denominator
+    ON_LEAVE = "on_leave"        # covered by an approved leave -- excluded from the denominator
     NEEDS_REVIEW = "needs_review"
 
 
@@ -122,21 +123,61 @@ class AttendanceStatus(str, enum.Enum):
 COUNTS_PRESENT = {AttendanceStatus.PRESENT.value, AttendanceStatus.LATE.value,
                   AttendanceStatus.ON_DUTY.value}
 #: Statuses removed from the denominator entirely -- approved absence is not a miss.
-EXCLUDED_FROM_TOTAL = {AttendanceStatus.EXCUSED.value}
+EXCLUDED_FROM_TOTAL = {AttendanceStatus.EXCUSED.value, AttendanceStatus.ON_LEAVE.value}
 
 
 class CaptureMethod(str, enum.Enum):
-    FACE = "face"                # the occlubio pipeline
+    FACE = "face"                # the occlubio pipeline, records DERIVED from sightings
     MANUAL = "manual"            # faculty marks a roster
-    QR = "qr"
+    QR = "qr"                    # student scanned the rotating classroom QR
     DEVICE = "device"            # biometric / RFID webhook
     IMPORT = "import"            # CSV backfill
+    CCTV = "cctv"                # classroom camera, written directly on confirmation
+    MOBILE = "mobile"            # student selfie from their own phone/laptop
+    SYSTEM = "system"            # filled at session close (absent / on leave)
 
 
 class LeaveType(str, enum.Enum):
-    CASUAL = "casual"
+    CASUAL = "casual"            # legacy value, still readable
     MEDICAL = "medical"
-    ON_DUTY = "on_duty"          # representing the org: counts as present
+    PERSONAL = "personal"
+    FAMILY_EMERGENCY = "family_emergency"
+    ON_DUTY = "on_duty"          # duty / event leave
+    OTHER = "other"
+
+
+class StudentStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class SessionState(str, enum.Enum):
+    SCHEDULED = "scheduled"
+    ACTIVE = "active"
+    CLOSED = "closed"
+
+
+class ReviewStatus(str, enum.Enum):
+    """Shared by every approve/reject workflow (enrollments, edit requests, review queue)."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class IssueStatus(str, enum.Enum):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+
+class IssueCategory(str, enum.Enum):
+    ATTENDANCE_CORRECTION = "attendance_correction"
+    ACADEMIC = "academic"
+    TECHNICAL = "technical"
+    PERSONAL = "personal"
     OTHER = "other"
 
 
@@ -151,6 +192,9 @@ class LeaveStatus(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    # A unique INDEX rather than a column constraint: SQLite cannot add a UNIQUE column to an
+    # existing table, but it can add a unique index, and NULLs never collide in either backend.
+    __table_args__ = (Index("uq_users_phone", "phone", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
@@ -180,12 +224,23 @@ class User(Base):
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
+    # --- sign-in hardening ----------------------------------------------------------------
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    locked_until: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    email_verified_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    # Tokens issued before this instant are rejected: changing or resetting a password signs
+    # every other device out.
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="user",
-                                                           cascade="all, delete-orphan")
+                                                           cascade="all, delete-orphan",
+                                                           foreign_keys="Enrollment.user_id")
 
     @property
     def has_biometrics(self) -> bool:
-        return any(e.is_active for e in self.enrollments)
+        return any(e.is_active and e.status == ReviewStatus.APPROVED.value
+                   for e in self.enrollments)
 
 
 class Enrollment(Base):
@@ -208,7 +263,21 @@ class Enrollment(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
-    user: Mapped[User] = relationship(back_populates="enrollments")
+
+    # Self-enrolled templates wait for a teacher; staff-captured ones are approved on creation.
+    # Pre-existing rows were created by staff, hence the `approved` server default.
+    status: Mapped[str] = mapped_column(String(16), default=ReviewStatus.APPROVED.value,
+                                        server_default=text("'approved'"), index=True)
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    review_note: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    liveness_passed: Mapped[bool] = mapped_column(Boolean, default=False,
+                                                  server_default=text("false"))
+    # Encrypted aligned face chips (112x112) so a teacher can verify the person. Wiped the
+    # moment the enrollment is approved or rejected -- only the template is kept.
+    samples_encrypted: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="enrollments", foreign_keys=[user_id])
 
 
 # -------------------------------------------------------------------- capture
@@ -228,6 +297,15 @@ class Camera(Base):
     measured_fps: Mapped[float] = mapped_column(Float, default=0.0)
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    # Stream credentials are Fernet-encrypted and spliced into the URL only inside the worker.
+    username_encrypted: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    password_encrypted: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    # Start/stop with the sessions scheduled in this room. Off for pre-existing cameras so an
+    # upgrade never starts streaming without an operator choosing it.
+    auto_start: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("false"))
+    offline_alerted_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
 
 class ClassSession(Base):
@@ -272,9 +350,21 @@ class ClassSession(Base):
     marked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     marked_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     # Locked after cfg.attendance.edit_window_hours; a locked record needs a correction request.
+    # `false`, not `0`: PostgreSQL refuses an integer default on a boolean column.
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False, index=True,
-                                            server_default=text("0"))
+                                            server_default=text("false"))
     deleted_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, index=True)
+
+    # --- lifecycle -------------------------------------------------------------------------
+    # Pre-existing sessions are history, so they migrate in as `closed`: the scheduler must
+    # never re-close an old register and fill it with absences. New sessions start `scheduled`.
+    state: Mapped[str] = mapped_column(String(16), default=SessionState.SCHEDULED.value,
+                                       server_default=text("'closed'"), index=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    started_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    # Per-session secret behind the rotating classroom code / QR. Never sent to students.
+    code_secret: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     camera: Mapped[Optional[Camera]] = relationship()
     owner: Mapped[User] = relationship(foreign_keys=[owner_id])
@@ -384,6 +474,11 @@ class AttendanceRecordRow(Base):
     overridden_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     overridden_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
+    # Who/what produced the current status, for the student's history and the audit trail.
+    marked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    marked_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
     @property
     def effective_status(self) -> str:
         return self.overridden_status or self.status
@@ -467,12 +562,48 @@ class Section(Base):
     name: Mapped[str] = mapped_column(String(32))                           # "A"
     year: Mapped[int] = mapped_column(Integer, default=1)
     semester: Mapped[int] = mapped_column(Integer, default=1)
+    # A section is the class group: branch (via program) + year + batch + section name.
+    batch_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("batches.id", ondelete="SET NULL"), nullable=True, index=True)
 
     program: Mapped[Program] = relationship(back_populates="sections")
+    batch: Mapped[Optional["Batch"]] = relationship()
 
     @property
     def label(self) -> str:
-        return f"{self.program.name} Y{self.year}S{self.semester}-{self.name}"
+        batch = f" {self.batch.label}" if self.batch is not None else ""
+        return f"{self.program.name} Y{self.year}S{self.semester}-{self.name}{batch}"
+
+
+class Batch(Base):
+    """An intake cohort, e.g. 2023–2027. Org-wide: CSE and ECE share the 2023 intake."""
+
+    __tablename__ = "batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    label: Mapped[str] = mapped_column(String(32), unique=True, index=True)     # "2023-2027"
+    start_year: Mapped[int] = mapped_column(Integer)
+    end_year: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Room(Base):
+    """A teaching room. `TimetableSlot.room` and `Camera.room` refer to `Room.name`.
+
+    The optional coordinates narrow the mobile-attendance geofence to one building; without
+    them the campus-wide geofence from settings applies.
+    """
+
+    __tablename__ = "rooms"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    building: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    radius_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Subject(Base):
@@ -483,6 +614,8 @@ class Subject(Base):
     name: Mapped[str] = mapped_column(String(160))
     department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"), index=True)
     credits: Mapped[int] = mapped_column(Integer, default=3)
+    year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    semester: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     department: Mapped[Department] = relationship()
 
@@ -502,6 +635,12 @@ class StudentProfile(Base):
     rows are not carrying null section columns."""
 
     __tablename__ = "student_profiles"
+    __table_args__ = (
+        # Roll numbers are unique within a branch + batch (a unique index, so it can be added
+        # to an existing database). NULL roll numbers -- legacy rows -- never collide.
+        Index("uq_profile_roll_branch_batch", "department_id", "batch_id", "roll_number",
+              unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"),
@@ -513,8 +652,43 @@ class StudentProfile(Base):
     parent_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
+    # --- registration ----------------------------------------------------------------------
+    roll_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    enrollment_no: Mapped[Optional[str]] = mapped_column(String(48), nullable=True, index=True)
+    department_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
+    batch_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("batches.id", ondelete="SET NULL"), nullable=True, index=True)
+    year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    dob: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
+    gender: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    guardian_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    guardian_phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    guardian_email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    photo_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stored_files.id", ondelete="SET NULL"), nullable=True)
+
+    # Pending -> Approved / Rejected by a teacher of the section. Rows that predate the
+    # approval flow were created by staff, hence the `approved` server default.
+    status: Mapped[str] = mapped_column(String(16), default=StudentStatus.APPROVED.value,
+                                        server_default=text("'approved'"), index=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    decided_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    # Set when the "you fell below the minimum" notice is sent; cleared on recovery, so the
+    # student is told once per crossing rather than after every lecture.
+    below_min_notified: Mapped[bool] = mapped_column(Boolean, default=False,
+                                                     server_default=text("false"))
+
     user: Mapped[User] = relationship(foreign_keys=[user_id])
     section: Mapped[Optional[Section]] = relationship()
+    department: Mapped[Optional[Department]] = relationship()
+    batch: Mapped[Optional[Batch]] = relationship()
+
+    @property
+    def is_approved(self) -> bool:
+        return self.status == StudentStatus.APPROVED.value
 
 
 class FacultyAssignment(Base):
@@ -624,6 +798,14 @@ class LeaveRequest(Base):
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
+    # Detailed explanation of the absence (`reason` stays the short summary).
+    explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # JSON list of session ids when the leave covers specific lectures rather than whole days.
+    session_ids: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attachment_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stored_files.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+
     requester: Mapped[User] = relationship(foreign_keys=[requester_id])
 
 
@@ -661,3 +843,231 @@ class Notification(Base):
     error: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    # Rendered text, so the in-app list never has to re-derive it from the payload.
+    title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+
+
+# ==========================================================================================
+# PORTAL: accounts, files, workflows, messaging
+# ==========================================================================================
+
+class StoredFile(Base):
+    """An uploaded file. Bytes live under var/uploads with a random name, never in a public
+    folder; they are served only through an authorised endpoint."""
+
+    __tablename__ = "stored_files"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    purpose: Mapped[str] = mapped_column(String(32), index=True)   # leave | issue | message | ...
+    original_name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(80))
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    storage_name: Mapped[str] = mapped_column(String(80), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class EmailOtp(Base):
+    """A one-time code. Only a hash is stored; attempts are capped."""
+
+    __tablename__ = "email_otps"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(32), default="verify_email")
+    code_hash: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    used_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ProfileEditRequest(Base):
+    """A student asking to change a field that was locked by approval (roll no, branch, ...)."""
+
+    __tablename__ = "profile_edit_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    changes: Mapped[str] = mapped_column(Text)                     # JSON {field: new value}
+    reason: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default=ReviewStatus.PENDING.value, index=True)
+    decided_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    remark: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class FaceReenrollRequest(Base):
+    """New glasses, a beard: a student asks to replace their template; a teacher allows it."""
+
+    __tablename__ = "face_reenroll_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    reason: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default=ReviewStatus.PENDING.value, index=True)
+    decided_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    remark: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class LivenessChallenge(Base):
+    """A server-issued, single-use, short-lived head-turn sequence."""
+
+    __tablename__ = "liveness_challenges"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(16))               # enroll | attendance
+    steps: Mapped[str] = mapped_column(String(200))                # JSON ["left","center","right"]
+    session_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("sessions.id", ondelete="CASCADE"), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    used_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class SelfMarkAttempt(Base):
+    """Every mobile/QR attempt, successful or not. Drives the retry limit and the audit."""
+
+    __tablename__ = "selfmark_attempts"
+    __table_args__ = (Index("ix_selfmark_session_user", "session_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    method: Mapped[str] = mapped_column(String(16))
+    success: Mapped[bool] = mapped_column(Boolean, default=False)
+    reason: Mapped[str] = mapped_column(String(300))
+    distance_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ReviewItem(Base):
+    """A near-threshold CCTV match waiting for the teacher. The face crop is encrypted on disk
+    and deleted after `review_retention_days`."""
+
+    __tablename__ = "review_queue"
+    __table_args__ = (Index("ix_review_session_status", "session_id", "status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    camera_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cameras.id", ondelete="SET NULL"), nullable=True)
+    score: Mapped[float] = mapped_column(Float)
+    frames: Mapped[int] = mapped_column(Integer, default=1)
+    seen_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    snapshot_path: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default=ReviewStatus.PENDING.value)
+    decided_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class Issue(Base):
+    __tablename__ = "issues"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    category: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default=IssueStatus.OPEN.value, index=True)
+    assigned_to_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    attachment_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stored_files.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+
+
+class IssueComment(Base):
+    __tablename__ = "issue_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    issue_id: Mapped[int] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text)
+    attachment_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stored_files.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Conversation(Base):
+    """One thread per (staff member, student) pair. Bulk messages fan out into these."""
+
+    __tablename__ = "conversations"
+    __table_args__ = (UniqueConstraint("staff_id", "student_id", name="uq_conversation_pair"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_message_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text)
+    attachment_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stored_files.id", ondelete="SET NULL"), nullable=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class Announcement(Base):
+    """Notice-board post. Audience is resolved at read time so new students see live notices."""
+
+    __tablename__ = "announcements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    # all | department | batch | section | students
+    audience_type: Mapped[str] = mapped_column(String(16), default="all")
+    audience_ids: Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # JSON list
+    attachment_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stored_files.id", ondelete="SET NULL"), nullable=True)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    send_email: Mapped[bool] = mapped_column(Boolean, default=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class AnnouncementRead(Base):
+    __tablename__ = "announcement_reads"
+    __table_args__ = (UniqueConstraint("announcement_id", "user_id", name="uq_announcement_read"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    announcement_id: Mapped[int] = mapped_column(
+        ForeignKey("announcements.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    read_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

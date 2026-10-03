@@ -10,14 +10,14 @@ edited, and a renamed person must not silently become a different identity.
 from __future__ import annotations
 
 import threading
-from typing import List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.crypto import decrypt_embedding
-from app.models import Enrollment
+from app.models import Enrollment, ReviewStatus
 from occlubio.gallery import FaissGallery
 from occlubio.utils import get_logger
 
@@ -27,24 +27,35 @@ _lock = threading.RLock()
 _gallery: Optional[FaissGallery] = None
 
 
+_templates: Dict[int, np.ndarray] = {}          # user_id -> approved template, mirrors the index
+
+
 def rebuild_index(db: Session, cfg) -> FaissGallery:
-    """Rebuild the whole index from active enrollments. Cheap: 1200 ids is milliseconds."""
-    global _gallery
+    """Rebuild the whole index from active, APPROVED enrollments. 1200 ids is milliseconds.
+
+    A self-enrolled template waiting for a teacher is deliberately absent: until a human has
+    checked that the face belongs to the account, it must not be able to mark anybody present.
+    """
+    global _gallery, _templates
     dim = int(cfg.recognition.embedding_dim)
     rows: List[Enrollment] = list(
-        db.scalars(select(Enrollment).where(Enrollment.is_active.is_(True)))
+        db.scalars(select(Enrollment).where(Enrollment.is_active.is_(True),
+                                            Enrollment.status == ReviewStatus.APPROVED.value))
     )
 
     g = FaissGallery(dim=dim)
+    templates: Dict[int, np.ndarray] = {}
     if rows:
         vectors, labels, metas = [], [], []
         for e in rows:
             try:
-                vectors.append(decrypt_embedding(e.embedding_encrypted, dim))
+                vec = decrypt_embedding(e.embedding_encrypted, dim)
             except (RuntimeError, ValueError) as exc:
                 # One unreadable row must not take the whole gallery down with it.
                 log.error("skipping enrollment %d for user %d: %s", e.id, e.user_id, exc)
                 continue
+            vectors.append(vec)
+            templates[e.user_id] = vec
             labels.append(str(e.user_id))
             metas.append({"enrollment_id": e.id, "n_images": e.n_images,
                           "mean_quality": e.mean_quality})
@@ -53,8 +64,28 @@ def rebuild_index(db: Session, cfg) -> FaissGallery:
 
     with _lock:
         _gallery = g
+        _templates = templates
     log.info("FAISS index rebuilt from DB: %d template(s)", len(g))
     return g
+
+
+def user_templates(db: Session, cfg, user_ids: Iterable[int]) -> Dict[int, np.ndarray]:
+    """Approved templates for exactly these users (a class roster, or one student)."""
+    get_gallery(db, cfg)                          # builds the index and template map if cold
+    wanted = set(user_ids)
+    with _lock:
+        return {uid: vec for uid, vec in _templates.items() if uid in wanted}
+
+
+def match_among(emb: np.ndarray, templates: Dict[int, np.ndarray]) -> Tuple[Optional[int], float]:
+    """Best cosine match of `emb` restricted to `templates`. Both sides are unit vectors."""
+    if not templates:
+        return None, 0.0
+    ids = list(templates)
+    mat = np.stack([templates[i] for i in ids])
+    scores = mat @ np.asarray(emb, dtype=np.float32).ravel()
+    best = int(np.argmax(scores))
+    return ids[best], float(scores[best])
 
 
 def get_gallery(db: Session, cfg) -> FaissGallery:
@@ -68,9 +99,10 @@ def get_gallery(db: Session, cfg) -> FaissGallery:
 
 def invalidate() -> None:
     """Force the next `get_gallery` to rebuild (tests, and after bulk changes)."""
-    global _gallery
+    global _gallery, _templates
     with _lock:
         _gallery = None
+        _templates = {}
 
 
 def search_top1(gallery: FaissGallery, emb: np.ndarray) -> Tuple[Optional[int], float]:

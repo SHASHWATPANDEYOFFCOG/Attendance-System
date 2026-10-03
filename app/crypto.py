@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from cryptography.fernet import Fernet, InvalidToken
 
 from occlubio.utils import get_logger, l2_normalize
@@ -105,17 +107,23 @@ def decrypt_embedding(blob: bytes, dim: int = 512) -> np.ndarray:
 
 
 # ------------------------------------------------------------------ passwords
+#
+# New hashes are argon2id (memory-hard). Hashes written before the switch are PBKDF2-SHA256;
+# they still verify, and `needs_rehash` tells the login path to upgrade them in place, so no
+# user is ever locked out by the migration.
+
+# The test suite creates hundreds of users; production parameters would add minutes to it.
+# Weak parameters are confined to ATTENDANCE_ENV=test and never reach a deployment.
+_argon = (PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1)
+          if os.environ.get(_ENV_ENV, "").lower() == "test" else PasswordHasher())
+
 
 def hash_password(password: str) -> str:
-    """PBKDF2-HMAC-SHA256. Stdlib only, no native build step on Windows."""
-    salt = secrets.token_bytes(16)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, _PBKDF2_ROUNDS)
-    return f"pbkdf2_sha256${_PBKDF2_ROUNDS}${base64.b64encode(salt).decode()}" \
-           f"${base64.b64encode(dk).decode()}"
+    """argon2id with the library's current recommended parameters."""
+    return _argon.hash(password)
 
 
-def verify_password(password: str, stored: str) -> bool:
-    """Constant-time verification; never raises on a malformed hash."""
+def _verify_pbkdf2(password: str, stored: str) -> bool:
     try:
         algo, rounds, salt_b64, dk_b64 = stored.split("$")
         if algo != "pbkdf2_sha256":
@@ -125,3 +133,55 @@ def verify_password(password: str, stored: str) -> bool:
         return hmac.compare_digest(dk, base64.b64decode(dk_b64))
     except (ValueError, TypeError):
         return False
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """Constant-time verification of either hash format; never raises on a malformed hash."""
+    if not stored:
+        return False
+    if stored.startswith("$argon2"):
+        try:
+            return _argon.verify(stored, password)
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
+            return False
+    return _verify_pbkdf2(password, stored)
+
+
+def needs_rehash(stored: str) -> bool:
+    """True for legacy PBKDF2 hashes and for argon2 hashes with outdated parameters."""
+    if not stored.startswith("$argon2"):
+        return True
+    try:
+        return _argon.check_needs_rehash(stored)
+    except InvalidHashError:
+        return True
+
+
+def token_digest(token: str) -> str:
+    """SHA-256 of a high-entropy random token (reset links). Not for passwords."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def otp_digest(code: str, salt: str) -> str:
+    """Keyed digest for short one-time codes, so a leaked table cannot be brute-forced offline
+    without also having the server key."""
+    key = hashlib.sha256(b"otp-digest:" + _load_key()).digest()   # never stored with the codes
+    return hmac.new(key, f"{salt}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def encrypt_bytes(data: bytes) -> bytes:
+    return fernet().encrypt(data)
+
+
+def decrypt_bytes(blob: bytes) -> bytes:
+    return fernet().decrypt(blob)
+
+
+def encrypt_text(value: str) -> bytes:
+    return fernet().encrypt(value.encode("utf-8"))
+
+
+def decrypt_text(blob: Optional[bytes]) -> Optional[str]:
+    if not blob:
+        return None
+    return fernet().decrypt(blob).decode("utf-8")

@@ -95,8 +95,11 @@ def current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
     payload = decode_token(token)
     user = db.get(User, int(payload["sub"]))
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.deleted_at is not None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user not found or disabled")
+    changed = user.password_changed_at
+    if changed is not None and int(payload.get("iat", 0)) < int(changed.timestamp()):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "session expired; sign in again")
     return user
 
 

@@ -24,6 +24,7 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
       items: [
         { href: "/staff/students", label: "Directory" },
         { href: "/staff/approvals", label: "Approvals", badge: counts.approvals },
+        { href: "/staff/review", label: "Camera review", badge: counts.review },
         { href: "/staff/leaves", label: "Leave", badge: counts.leaves },
         { href: "/staff/issues", label: "Issues", badge: counts.issues },
       ],
@@ -36,7 +37,13 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
         { href: "/staff/notifications", label: "Notifications", badge: counts.notifications },
       ],
     },
-    { title: "Setup", items: [{ href: "/staff/setup", label: "Academic setup" }] },
+    {
+      title: "Setup",
+      items: [
+        { href: "/staff/setup", label: "Academic setup" },
+        { href: "/staff/cameras", label: "CCTV cameras" },
+      ],
+    },
     {
       title: "Administration",
       items: [

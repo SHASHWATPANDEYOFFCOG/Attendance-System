@@ -10,7 +10,8 @@ type Projection = {
   can_miss: number;
   reachable: boolean;
   at_risk: boolean;
-  current_pct: number;
+  /** null until the first class is held — there is no percentage of nothing. */
+  current_pct: number | null;
   projected_pct: number;
   remaining: number;
   /** Consecutive classes to attend to reach the minimum; 0 when already there. */
@@ -59,17 +60,18 @@ export function AttendanceRing({
   pct,
   threshold,
 }: {
-  pct: number;
+  pct: number | null;
   threshold: number;
 }) {
+  const none = pct === null;
   const size = 168;
   const stroke = 14;
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(100, pct));
+  const clamped = Math.max(0, Math.min(100, pct ?? 0));
   const dash = (clamped / 100) * circumference;
-  const meets = pct >= threshold;
-  const colour = meets ? "var(--status-present)" : "var(--status-absent)";
+  const meets = none || clamped >= threshold;
+  const colour = none ? "var(--rule)" : meets ? "var(--status-present)" : "var(--status-absent)";
 
   return (
     <figure className="m-0 flex flex-col items-center">
@@ -116,7 +118,7 @@ export function AttendanceRing({
           fill="var(--ink)"
           style={{ font: "600 34px var(--font-mono)", fontVariantNumeric: "tabular-nums" }}
         >
-          {clamped.toFixed(1)}%
+          {none ? "—" : `${clamped.toFixed(1)}%`}
         </text>
         <text
           x="50%"
@@ -129,7 +131,7 @@ export function AttendanceRing({
         </text>
       </svg>
       <figcaption className="sr-only">
-        Current attendance {clamped.toFixed(1)}%, against a minimum of {threshold}%.
+        {none ? "No classes held yet" : `Current attendance ${clamped.toFixed(1)}%`}, against a minimum of {threshold}%.
       </figcaption>
     </figure>
   );
@@ -138,6 +140,17 @@ export function AttendanceRing({
 /* ------------------------------------------------------- the can-miss line */
 
 export function CanMiss({ p, threshold }: { p: Projection; threshold: number }) {
+  if (p.current_pct === null) {
+    return (
+      <div>
+        <span className="label block">No classes held yet</span>
+        <p className="mt-1 text-[13.5px] text-ash">
+          Your percentage starts with your first class. You need to attend at least {threshold}% of classes
+          {p.remaining ? <> — {p.remaining} are scheduled for the rest of this term</> : null}.
+        </p>
+      </div>
+    );
+  }
   if (!p.reachable) {
     return (
       <div>

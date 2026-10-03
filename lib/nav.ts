@@ -8,6 +8,14 @@ export type Counts = Partial<Record<
   "approvals" | "notifications" | "messages" | "announcements" | "leaves" | "issues" | "review", number
 >>;
 
+const HELP: NavGroup = {
+  title: "Help",
+  items: [
+    { href: "/guide", label: "User guide" },
+    { href: "/privacy", label: "Privacy" },
+  ],
+};
+
 export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
   const admin = role === "admin" || role === "super_admin";
   return [
@@ -52,6 +60,7 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
         ...(role === "super_admin" ? [{ href: "/staff/admin/audit", label: "Audit log" }] : []),
       ],
     },
+    HELP,
   ];
 }
 
@@ -85,5 +94,6 @@ export function studentNav(counts: Counts = {}): NavGroup[] {
         { href: "/student/face", label: "Face check" },
       ],
     },
+    HELP,
   ];
 }

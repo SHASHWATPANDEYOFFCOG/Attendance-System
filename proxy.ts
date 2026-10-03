@@ -29,6 +29,7 @@ const PUBLIC_PATHS = [
   "/api/public",
   "/manifest.webmanifest",
   "/sw.js",
+  "/offline.html",
   "/icons",
 ];
 

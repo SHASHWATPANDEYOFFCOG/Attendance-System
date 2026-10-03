@@ -53,7 +53,9 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
       setError(e instanceof Error ? e.message : "Could not load the session.");
     }
   }, [sid]);
-  refetch.current = load;
+  useEffect(() => {
+    refetch.current = load;
+  }, [load]);
 
   useEffect(() => {
     load();

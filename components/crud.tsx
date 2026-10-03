@@ -276,7 +276,7 @@ export function CrudTable<T extends { id: number }>({
       ) : rows.length === 0 ? (
         <EmptyState title={`No ${title.toLowerCase()} yet`}>{empty}</EmptyState>
       ) : (
-        <div className="-mx-1 overflow-x-auto">
+        <div className="relative -mx-1 overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-[13.5px]">
             <thead>
               <tr>
@@ -285,7 +285,7 @@ export function CrudTable<T extends { id: number }>({
                     {c.label}
                   </th>
                 ))}
-                <th className="label border-b-2 border-ink px-2 pb-1.5 text-right">
+                <th className="relative label border-b-2 border-ink px-2 pb-1.5 text-right">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>

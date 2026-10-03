@@ -159,7 +159,7 @@ export default async function DashboardPage() {
       {warnings.map((w) => (
         <Banner key={w} bad={/ANTI-SPOOF/i.test(w)}>
           <strong className="label mb-0.5 block text-[12px]">
-            {/ANTI-SPOOF/i.test(w) ? "Anti-spoofing" : /CLOCK/i.test(w) ? "Host clock" : "Thresholds"}
+            {/ANTI-SPOOF/i.test(w) ? "Anti-spoofing" : /CLOCK/i.test(w) ? "Host clock" : /EMAIL/i.test(w) ? "Email" : "Thresholds"}
           </strong>
           {w}
         </Banner>

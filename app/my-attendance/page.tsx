@@ -28,7 +28,7 @@ export default async function MyAttendance() {
 
   const threshold = summary?.threshold_pct ?? 75;
   const overall = summary?.overall;
-  const meets = (overall?.current_pct ?? 0) >= threshold;
+  const meets = overall?.current_pct == null || overall.current_pct >= threshold;
 
   return (
     <main className="relative z-[1] mx-auto max-w-[1100px] px-4 pb-16 pt-6 md:px-5">

@@ -54,6 +54,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
   const s = d.student;
   const a = d.attendance;
   const overall = a.overall;
+  const below = overall.current_pct !== null && overall.current_pct < a.threshold_pct;
 
   const facts: [string, string | null | undefined][] = [
     ["Roll number", s.roll_number], ["Enrollment no.", s.enrollment_no], ["Branch", s.department],
@@ -118,14 +119,14 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
         <div className="grid content-start gap-4">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatTile label="Attendance" value={`${overall.current_pct}%`} tone={overall.current_pct < a.threshold_pct ? "oxide" : "verdant"} sub={`minimum ${a.threshold_pct}%`} />
+            <StatTile label="Attendance" value={overall.current_pct === null ? "—" : `${overall.current_pct}%`} tone={below ? "oxide" : "verdant"} sub={overall.current_pct === null ? "no classes yet" : `minimum ${a.threshold_pct}%`} />
             <StatTile label="Classes held" value={overall.counted} />
             <StatTile label="Attended" value={overall.present} />
             <StatTile
-              label={overall.current_pct < a.threshold_pct ? "Needs" : "Can miss"}
-              value={overall.current_pct < a.threshold_pct ? `+${(overall as { classes_needed?: number }).classes_needed ?? 0}` : overall.can_miss}
-              sub={overall.current_pct < a.threshold_pct ? "classes in a row" : "classes this term"}
-              tone={overall.current_pct < a.threshold_pct ? "oxide" : "ink"}
+              label={below ? "Needs" : "Can miss"}
+              value={below ? `+${(overall as { classes_needed?: number }).classes_needed ?? 0}` : overall.can_miss}
+              sub={below ? "classes in a row" : "classes this term"}
+              tone={below ? "oxide" : "ink"}
             />
           </div>
           <Card>

@@ -1,0 +1,100 @@
+/** Short user guide for students and teachers. Public, so it helps before the first sign-in. */
+import Link from "next/link";
+
+import { PublicShell } from "@/components/public-shell";
+
+export const metadata = { title: "User guide" };
+
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-[13px] font-semibold"
+            style={{ background: "var(--ink)", color: "var(--card)" }}>{n}</span>
+      <div className="min-w-0">
+        <strong className="text-[15px]">{title}</strong>
+        <div className="text-[14px] text-ink/85">{children}</div>
+      </div>
+    </li>
+  );
+}
+
+export default function GuidePage() {
+  return (
+    <PublicShell width={820} subtitle="User guide">
+      <div className="grid gap-4">
+        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="students">
+          <h1 id="students" className="display m-0 mb-3 text-[20px]">For students</h1>
+          <ol className="m-0 grid list-none gap-3.5 p-0">
+            <Step n={1} title="Register">
+              Open <Link href="/signup" className="underline">Register</Link>, fill in your details exactly as in college
+              records, choose your branch, year, batch and section, and add a profile photo. Enter the 6-digit code we email you.
+            </Step>
+            <Step n={2} title="Wait for approval">
+              Your class teacher checks and approves your account. You can sign in meanwhile, but cannot mark attendance until
+              approved. If rejected, the reason is shown — fix your details in <em>My profile</em> and resubmit.
+            </Step>
+            <Step n={3} title="(Optional) Enroll your face">
+              In <em>Face check</em>, read and accept the consent, then follow the on-screen prompts: look straight, then turn
+              and tilt your head slightly as asked. Good light, no mask or sunglasses. Your teacher approves it.
+            </Step>
+            <Step n={4} title="Mark attendance in class">
+              When a lecture is live, <em>Mark attendance</em> appears on your dashboard. Use <strong>Face check</strong> (a short
+              selfie with head turns) or <strong>Classroom code</strong> (scan the QR on the screen or type its 6 digits). Your
+              location is checked once. Within 10 minutes of the start you are Present, until 20 minutes Late, after that the
+              window closes. Classroom cameras may also mark you automatically.
+            </Step>
+            <Step n={5} title="Leave, issues and messages">
+              Apply for leave (with a certificate if you have one) under <em>Leave</em> — approved leave becomes “On leave” and
+              does not count against you. Raise attendance corrections or other problems under <em>Issues</em>. Messages and
+              notices from teachers appear under <em>Messages</em>, and the bell shows new notifications instantly.
+            </Step>
+            <Step n={6} title="Keep above the minimum">
+              Your dashboard shows your percentage per subject, a calendar, and — if you are below the minimum — exactly how many
+              classes in a row you need. Download your history as a PDF from <em>History</em>.
+            </Step>
+          </ol>
+          <div className="mt-4 rounded-[3px] bg-tint p-3 text-[13.5px]">
+            <strong>Camera or location blocked?</strong> On Android Chrome: tap the lock icon by the address → Permissions → allow
+            Camera and Location. On iPhone Safari: tap <strong>aA</strong> → Website Settings → allow Camera and Location, and check
+            Settings → Privacy &amp; Security → Location Services is on.
+          </div>
+        </section>
+
+        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="teachers">
+          <h2 id="teachers" className="display m-0 mb-3 text-[20px]">For teachers</h2>
+          <ol className="m-0 grid list-none gap-3.5 p-0">
+            <Step n={1} title="Your classes">
+              The admin or HOD assigns you subjects and classes and builds the timetable (Setup). You see only students of
+              your classes — everywhere: directory, reports, leave, issues.
+            </Step>
+            <Step n={2} title="Approvals">
+              <em>Approvals</em> lists new registrations (check details against college records), profile corrections and face
+              enrollments (compare the photos with the profile photo). A rejection always needs a reason.
+            </Step>
+            <Step n={3} title="Running a lecture">
+              Lectures start by themselves at the timetabled time (or press <em>Start session</em> in <em>Live sessions</em>).
+              Open <em>Show QR full-screen</em> on the classroom projector. The live view fills in as students mark; tap P / L / A
+              / O / E to mark anyone by hand. Changing a mark that is already recorded asks for a reason — it goes to the audit
+              log and to the student. At the end time everyone unmarked becomes Absent (or On leave if covered by approved leave).
+            </Step>
+            <Step n={4} title="Cameras">
+              Classroom cameras mark students they are confident about. Near matches wait in <em>Camera review</em> with a face
+              crop next to the profile photo — accept or reject. If a camera goes offline during your lecture you are notified.
+            </Step>
+            <Step n={5} title="Leave, issues, messages, notices">
+              Approve leave (approved leave also corrects absences already recorded), answer issues, message one student, a class
+              or everyone in your classes, and post notices with optional email.
+            </Step>
+            <Step n={6} title="Reports">
+              <em>Reports</em> gives daily, monthly, subject-wise, student-wise and defaulter reports for any date range, each
+              downloadable as CSV, Excel or PDF.
+            </Step>
+          </ol>
+        </section>
+        <p className="m-0 text-center text-[13px] text-ash">
+          <Link href="/privacy" className="text-ink underline">Privacy policy</Link> · <Link href="/login" className="text-ink underline">Sign in</Link>
+        </p>
+      </div>
+    </PublicShell>
+  );
+}

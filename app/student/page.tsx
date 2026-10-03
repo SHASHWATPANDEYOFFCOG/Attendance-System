@@ -66,7 +66,7 @@ export default async function StudentHome() {
 
   const threshold = summary?.threshold_pct ?? 75;
   const overall = summary?.overall;
-  const below = overall && overall.counted > 0 && overall.current_pct < threshold;
+  const below = overall && overall.current_pct !== null && overall.current_pct < threshold;
   const markable = active?.sessions.filter((s) => !s.marked && s.window_open) ?? [];
 
   return (
@@ -162,9 +162,9 @@ export default async function StudentHome() {
             <StatTile label="Still scheduled" value={overall.remaining} sub="this term" />
             <StatTile
               label="To reach minimum"
-              value={overall.classes_needed ? `+${overall.classes_needed}` : "On track"}
-              tone={overall.classes_needed ? "oxide" : "verdant"}
-              sub={overall.classes_needed ? "classes in a row" : `at or above ${threshold}%`}
+              value={overall.current_pct === null ? "—" : overall.classes_needed ? `+${overall.classes_needed}` : "On track"}
+              tone={overall.current_pct === null ? "ink" : overall.classes_needed ? "oxide" : "verdant"}
+              sub={overall.current_pct === null ? "after your first class" : overall.classes_needed ? "classes in a row" : `at or above ${threshold}%`}
             />
           </div>
 

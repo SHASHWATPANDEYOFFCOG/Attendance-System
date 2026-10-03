@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
 import "./globals.css";
+import { RegisterServiceWorker } from "@/components/pwa";
 import { UiProvider } from "@/components/toast";
 
 /* A deliberate pairing, not Inter for everything:
@@ -30,6 +31,21 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: { default: "Attendance Register", template: "%s · Attendance Register" },
   description: "Occlusion-robust attendance for scheduled sessions",
+  applicationName: "Attendance Register",
+  appleWebApp: { capable: true, title: "Attendance", statusBarStyle: "default" },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#16304F" },
+    { media: "(prefers-color-scheme: dark)", color: "#11161D" },
+  ],
 };
 
 /**
@@ -59,6 +75,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="flex min-h-full flex-col">
         <UiProvider>{children}</UiProvider>
+        <RegisterServiceWorker />
       </body>
     </html>
   );

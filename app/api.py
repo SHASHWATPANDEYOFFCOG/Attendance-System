@@ -1227,11 +1227,16 @@ from app.routes import academic as _academic  # noqa: E402
 from app.routes import accounts as _accounts  # noqa: E402
 from app.routes import admin as _admin  # noqa: E402
 from app.routes import files as _files  # noqa: E402
+from app.routes import issues as _issues  # noqa: E402
+from app.routes import leaves as _leaves  # noqa: E402
+from app.routes import messaging as _messaging  # noqa: E402
+from app.routes import notifications as _notifications  # noqa: E402
 from app.routes import sessions as _sessions  # noqa: E402
 from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
-           _sessions.router):
+           _sessions.router, _leaves.router, _issues.router, _messaging.router,
+           _notifications.router):
     app.include_router(_r)
 
 

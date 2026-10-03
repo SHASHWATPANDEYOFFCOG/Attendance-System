@@ -96,5 +96,13 @@ def _sessions(db) -> None:
     tick(db, cfg)
 
 
+def _weekly_digest(db) -> None:
+    from app.digest import run
+    from app.runtime import cfg
+
+    run(db, cfg)
+
+
 scheduler.add("email", 5.0, _dispatch_emails)
 scheduler.add("sessions", 30.0, _sessions)
+scheduler.add("weekly_digest", 600.0, _weekly_digest)

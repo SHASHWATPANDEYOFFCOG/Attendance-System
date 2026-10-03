@@ -16,7 +16,7 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
         { href: "/dashboard", label: "Dashboard", exact: true },
         { href: "/staff/sessions", label: "Live sessions" },
         { href: "/mark", label: "Registers" },
-        { href: "/reports", label: "Reports" },
+        { href: "/staff/reports", label: "Reports" },
       ],
     },
     {

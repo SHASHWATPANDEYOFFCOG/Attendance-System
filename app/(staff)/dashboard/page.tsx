@@ -5,6 +5,7 @@
  * no data the signed-in role is not entitled to ever reaches the browser. There is no
  * client-side filtering to bypass.
  */
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { apiGet, apiGetAll } from "@/lib/api";
@@ -22,6 +23,13 @@ import { Banner, Card, CardHeader, Empty, Pill, StatTile } from "@/components/ui
 
 export const dynamic = "force-dynamic";
 
+type Counts = { roster: number; present: number; late: number; absent: number; on_leave: number; unmarked: number };
+type LivePayload = {
+  periods: { slot_id: number | null; subject_code: string | null; subject_name: string | null; start_time: string;
+    section_label: string | null; holiday: string | null; session: { id: number; state: string; counts: Counts } | null }[];
+};
+type ClassesPayload = { days: number; threshold_pct: number; classes: { section_id: number | null; label: string; pct: number | null; lectures: number }[] };
+
 export default async function DashboardPage() {
   // Students and parents get a self-scoped payload from /api/dashboard, so this staff screen
   // would render empty for them. Send them to their own view instead of showing a wall of
@@ -36,7 +44,21 @@ export default async function DashboardPage() {
     weekday: "/api/analytics/weekday?days=90",
     defaulters: "/api/reports/defaulters?limit=12",
     today: "/api/timetable/today",
+    live: "/api/sessions/live",
+    classes: "/api/analytics/classes?days=30",
+    counts: "/api/notifications/counts",
+    approvals: "/api/approvals/summary",
   });
+  const live = raw.live as LivePayload | null;
+  const classes = raw.classes as ClassesPayload | null;
+  const counts = (raw.counts ?? {}) as Record<string, number>;
+  const approvals = raw.approvals as { total: number } | null;
+  const attention: [string, number, string][] = [
+    ["Approvals", approvals?.total ?? 0, "/staff/approvals"],
+    ["Leave requests", counts.leaves ?? 0, "/staff/leaves"],
+    ["Open issues", counts.issues ?? 0, "/staff/issues"],
+    ["Camera reviews", counts.review ?? 0, "/staff/review"],
+  ];
 
   const me = safe(DashboardSchema, raw.me);
   const summary = safe(SummarySchema, raw.summary);
@@ -59,8 +81,80 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/staff/sessions" className="display rounded-[3px] border px-3.5 py-2 text-[12px] no-underline"
+                style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>Live sessions</Link>
+          <Link href="/staff/reports" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Reports</Link>
         </div>
       </header>
+
+      <nav aria-label="Needs attention" className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {attention.map(([label, n, href]) => (
+          <Link key={href} href={href} className="no-underline">
+            <StatTile label={label} value={n} tone={n ? "amber" : "verdant"} sub={n ? "waiting for you" : "all clear"} />
+          </Link>
+        ))}
+      </nav>
+
+      {live && live.periods.length ? (
+        <Card className="mb-4">
+          <CardHeader title="Today's sessions" meta={<Link href="/staff/sessions" className="text-ink">Open live view</Link>} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] border-collapse text-[13.5px]">
+              <thead>
+                <tr>
+                  {["Time", "Subject", "Class", "State", "Present", "Late", "Absent", "Leave", "Unmarked"].map((h) => (
+                    <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {live.periods.map((p, i) => {
+                  const c = p.session?.counts;
+                  return (
+                    <tr key={p.session?.id ?? `slot-${p.slot_id}-${i}`} className="hover:bg-tint">
+                      <td className="border-b border-rule px-2 py-1.5 font-mono tnum">{p.start_time}</td>
+                      <td className="border-b border-rule px-2">
+                        {p.session ? <Link href={`/staff/sessions/${p.session.id}`} className="text-ink">{p.subject_code ?? p.subject_name}</Link> : (p.subject_code ?? p.subject_name)}
+                      </td>
+                      <td className="border-b border-rule px-2">{p.section_label}</td>
+                      <td className="border-b border-rule px-2">
+                        {p.holiday ? <Pill tone="neutral">holiday</Pill> : p.session ? <Pill tone={p.session.state === "active" ? "ok" : p.session.state === "closed" ? "neutral" : "warn"}>{p.session.state}</Pill> : <Pill tone="neutral">not started</Pill>}
+                      </td>
+                      {(["present", "late", "absent", "on_leave", "unmarked"] as const).map((k) => (
+                        <td key={k} className="border-b border-rule px-2 font-mono tnum">{c ? c[k] : "—"}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
+
+      {classes && classes.classes.length ? (
+        <Card className="mb-4">
+          <CardHeader title="Class-wise attendance" meta={`last ${classes.days} days · minimum ${classes.threshold_pct}%`} />
+          <ul className="m-0 grid list-none gap-2 p-0 md:grid-cols-2">
+            {classes.classes.map((c) => {
+              const pct = c.pct ?? 0;
+              const below = pct < classes.threshold_pct;
+              return (
+                <li key={c.section_id ?? c.label}>
+                  <div className="flex items-baseline justify-between text-[13.5px]">
+                    <span>{c.label}</span>
+                    <span className="font-mono tnum" style={{ color: below ? "var(--oxide)" : "var(--ink)" }}>{pct}% <span className="text-ash">({c.lectures})</span></span>
+                  </div>
+                  <div className="relative mt-1 h-2 rounded-[2px]" style={{ background: "var(--tint-hard)" }} role="img" aria-label={`${c.label}: ${pct} percent`}>
+                    <div className="h-full rounded-[2px]" style={{ width: `${Math.min(100, pct)}%`, background: below ? "var(--status-absent)" : "var(--status-present)" }} />
+                    <div className="absolute top-0 h-full" style={{ left: `${classes.threshold_pct}%`, width: 2, background: "var(--ink)" }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
 
       {warnings.map((w) => (
         <Banner key={w} bad={/ANTI-SPOOF/i.test(w)}>

@@ -75,6 +75,7 @@ export function StudentActions({
   return (
     <div className="flex flex-wrap gap-2">
       <Button onClick={() => router.push(`/staff/messages?student=${studentId}`)}>Message</Button>
+      <Button onClick={() => router.push(`/staff/reports?kind=student-wise&student_id=${studentId}`)}>Report</Button>
       {status !== "approved" ? (
         <Button variant="primary" onClick={approve} disabled={!emailVerified} title={emailVerified ? undefined : "Waiting for the student to verify their email"}>
           Approve

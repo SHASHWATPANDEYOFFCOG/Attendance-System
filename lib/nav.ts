@@ -71,6 +71,12 @@ export function studentNav(counts: Counts = {}): NavGroup[] {
         { href: "/student/notifications", label: "Notifications", badge: counts.notifications },
       ],
     },
-    { title: "Account", items: [{ href: "/student/profile", label: "My profile" }] },
+    {
+      title: "Account",
+      items: [
+        { href: "/student/profile", label: "My profile" },
+        { href: "/student/face", label: "Face check" },
+      ],
+    },
   ];
 }

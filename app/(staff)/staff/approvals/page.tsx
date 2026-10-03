@@ -12,6 +12,7 @@ import { Card, Pill } from "@/components/ui";
 import { Button } from "@/components/forms";
 import { EmptyState, PageError, PageLoading } from "@/components/states";
 import { useUi } from "@/components/toast";
+import { FaceReview } from "@/components/face-review";
 
 type Pending = {
   id: number; full_name: string; email: string | null; roll_number: string | null; section: string | null;
@@ -26,6 +27,7 @@ type Summary = { registrations: number; edit_requests: number; face_enrollments:
 const TABS = [
   ["registrations", "Registrations"],
   ["edits", "Profile edits"],
+  ["faces", "Face enrollments"],
 ] as const;
 
 export default function ApprovalsPage() {
@@ -46,11 +48,12 @@ function Approvals() {
   const count: Record<string, number | undefined> = {
     registrations: summary?.registrations,
     edits: summary?.edit_requests,
+    faces: summary ? summary.face_enrollments + summary.reenroll_requests : undefined,
   };
 
   return (
     <Page wide>
-      <PageHeader title="Approvals" subtitle="Registrations and profile corrections waiting for you" />
+      <PageHeader title="Approvals" subtitle="Registrations, profile corrections and face enrollments waiting for you" />
       <nav aria-label="Approval types" className="mb-4 flex flex-wrap gap-1">
         {TABS.map(([key, label]) => (
           <Link
@@ -65,7 +68,9 @@ function Approvals() {
           </Link>
         ))}
       </nav>
-      {tab === "edits" ? <EditRequests onChange={loadSummary} /> : <Registrations onChange={loadSummary} />}
+      {tab === "edits" ? <EditRequests onChange={loadSummary} />
+        : tab === "faces" ? <FaceReview onChange={loadSummary} />
+        : <Registrations onChange={loadSummary} />}
     </Page>
   );
 }

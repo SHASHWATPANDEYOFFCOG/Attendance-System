@@ -15,6 +15,8 @@ import { Banner, Card, CardHeader, Mark, Pill } from "@/components/ui";
 import { Button, TextField } from "@/components/forms";
 import { EmptyState, PageError, PageLoading } from "@/components/states";
 import { getLocation, LocationHelp, type GeoFailure } from "@/components/geo-help";
+import { SelfieMark } from "@/components/selfie-mark";
+import Link from "next/link";
 
 type ActiveSession = {
   id: number; subject_code: string | null; subject_name: string | null; room: string;
@@ -65,7 +67,8 @@ export default function MarkPage() {
   );
 }
 
-function SessionCard({ s, onDone }: { s: ActiveSession; data: Payload; onDone: () => void }) {
+function SessionCard({ s, data, onDone }: { s: ActiveSession; data: Payload; onDone: () => void }) {
+  const [mode, setMode] = useState<"selfie" | "code">(data.face_ready ? "selfie" : "code");
   const start = new Date(s.scheduled_start);
   return (
     <Card>
@@ -91,7 +94,25 @@ function SessionCard({ s, onDone }: { s: ActiveSession; data: Payload; onDone: (
             You will be marked <Pill tone={s.would_be === "late" ? "warn" : "ok"}>{s.would_be}</Pill>{" "}
             · {s.attempts_left} attempt{s.attempts_left === 1 ? "" : "s"} left
           </p>
-          <CodeMark sessionId={s.id} onDone={onDone} />
+          <div role="tablist" aria-label="How to mark" className="mb-3 flex gap-1">
+            {(["selfie", "code"] as const).map((m) => (
+              <button key={m} role="tab" type="button" aria-selected={mode === m} onClick={() => setMode(m)}
+                      className="display cursor-pointer rounded-[3px] border px-3 py-1.5 text-[11.5px]"
+                      style={mode === m ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
+                {m === "selfie" ? "Face check" : "Classroom code / QR"}
+              </button>
+            ))}
+          </div>
+          {mode === "code" ? (
+            <CodeMark sessionId={s.id} onDone={onDone} />
+          ) : data.face_ready ? (
+            <SelfieMark sessionId={s.id} requiresCode={data.requires_code} onDone={onDone} />
+          ) : (
+            <Banner>
+              The face check needs your face enrolled and approved first.{" "}
+              <Link href="/student/face" className="text-ink underline">Enroll your face</Link> (one time), or use the classroom code.
+            </Banner>
+          )}
         </>
       )}
     </Card>

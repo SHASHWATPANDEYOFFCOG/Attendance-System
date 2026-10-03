@@ -11,8 +11,16 @@ from test_portal_sessions import _db, _make_session, klass  # noqa: F401  (fixtu
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 
 
+def _local_today():
+    """The college's calendar day: lectures and leave dates are judged in local time."""
+    from app.clock import local_today, tz_of
+    from app.runtime import cfg
+
+    return local_today(tz_of(cfg))
+
+
 def _apply(api, h, **over):
-    today = datetime.now(timezone.utc).date()
+    today = _local_today()
     form = {"type": "medical", "from_date": today.isoformat(), "to_date": today.isoformat(),
             "reason": "Fever", "explanation": "Doctor advised rest for a day."}
     form.update({k: str(v) for k, v in over.items() if not k.startswith("_")})
@@ -56,7 +64,7 @@ def test_leave_apply_scope_and_approval_rewrites_closed_absence(api, klass):
 
 def test_leave_validation(api, klass):
     h = klass["h"][klass["students"][0]]
-    today = datetime.now(timezone.utc).date()
+    today = _local_today()
     r = _apply(api, h, from_date=today, to_date=today - timedelta(days=1))
     assert r.status_code == 422 and r.json()["detail"]["field"] == "to_date"
     r = _apply(api, h, from_date=today - timedelta(days=30), to_date=today - timedelta(days=29))
@@ -77,7 +85,7 @@ def test_leave_validation(api, klass):
 def test_leave_edit_and_cancel_only_while_pending(api, klass):
     h = klass["h"][klass["students"][1]]
     lid = _apply(api, h).json()["id"]
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = _local_today().isoformat()
     r = api.post(f"/api/me/leaves/{lid}", data={"type": "personal", "from_date": today,
                                                  "to_date": today, "reason": "Family function",
                                                  "remove_attachment": "true"}, headers=h)
@@ -111,10 +119,12 @@ def test_specific_lecture_leave_only_covers_those_lectures(api, klass):
         api.post(f"/api/sessions/{s}/stop", headers=klass["teacher_h"])
     uid = klass["students"][2]
     h = klass["h"][uid]
-    lectures = api.get(f"/api/me/leaves/lectures?from_date={date.today() - timedelta(days=1)}"
-                       f"&to_date={date.today() + timedelta(days=1)}", headers=h).json()
+    lectures = api.get(f"/api/me/leaves/lectures?from_date={_local_today() - timedelta(days=1)}"
+                       f"&to_date={_local_today() + timedelta(days=1)}", headers=h).json()
     assert {l["id"] for l in lectures} >= {s1, s2}
-    lid = _apply(api, h, session_ids=json.dumps([s1]), _file=None).json()["id"]
+    # The two lectures were 1-2 hours ago, which can straddle local midnight: span both days.
+    lid = _apply(api, h, session_ids=json.dumps([s1]), _file=None,
+                 from_date=_local_today() - timedelta(days=1), to_date=_local_today()).json()["id"]
     api.post(f"/api/leaves/{lid}/approve", json={}, headers=klass["teacher_h"])
     db = _db()
     st = {r.session_id: r.effective_status

@@ -262,7 +262,10 @@ def test_close_marks_remaining_absent_and_leave_covered_on_leave(api, klass):
     sid = _make_session(klass)
     s0, s1, s2, _s3 = klass["students"]
     _qr(api, klass, s0, sid)
-    today = datetime.now(timezone.utc).date()
+    from app.clock import local_today, tz_of
+    from app.runtime import cfg as _cfg
+
+    today = local_today(tz_of(_cfg))
     db = _db()
     db.add(LeaveRequest(requester_id=s1, type="medical", from_date=today - timedelta(days=1),
                         to_date=today + timedelta(days=1), reason="flu", status="approved"))
@@ -290,7 +293,10 @@ def test_approved_leave_rewrites_already_closed_absences(api, klass):
     sid = _make_session(klass)
     api.post(f"/api/sessions/{sid}/stop", headers=klass["teacher_h"])
     uid = klass["students"][2]
-    today = datetime.now(timezone.utc).date()
+    from app.clock import local_today, tz_of
+    from app.runtime import cfg as _cfg
+
+    today = local_today(tz_of(_cfg))
     db = _db()
     leave = LeaveRequest(requester_id=uid, type="medical", from_date=today - timedelta(days=1),
                          to_date=today + timedelta(days=1), reason="x", status="approved")
@@ -333,7 +339,10 @@ def test_scheduler_opens_starts_and_closes_from_the_timetable(api, klass):
 def test_no_session_on_a_holiday(api, klass):
     from app.models import Holiday, TimetableSlot
 
-    today = datetime.now(timezone.utc).date()
+    from app.clock import local_today, tz_of
+    from app.runtime import cfg
+
+    today = local_today(tz_of(cfg))
     db = _db()
     slot = TimetableSlot(section_id=klass["section"], subject_id=klass["subject"],
                          faculty_id=klass["teacher"], term_id=klass["term"],

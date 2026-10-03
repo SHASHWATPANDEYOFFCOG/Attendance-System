@@ -43,8 +43,13 @@ _EXCLUDED = tuple(sorted(EXCLUDED_FROM_TOTAL))
 
 
 def _counted() -> "case":
-    """1 when the row belongs in the denominator, else 0."""
-    return case((AttendanceRecordRow.status.in_(_EXCLUDED), 0), else_=1)
+    """1 when the row belongs in the denominator, else 0.
+
+    Uses the EFFECTIVE status, like the numerator: a teacher excusing an absence must take it
+    out of the denominator too, or the student is still penalised for it.
+    """
+    effective = func.coalesce(AttendanceRecordRow.overridden_status, AttendanceRecordRow.status)
+    return case((effective.in_(_EXCLUDED), 0), else_=1)
 
 
 def _present() -> "case":
@@ -329,13 +334,16 @@ def student_summary(db: Session, user: User, *, threshold: float = 75.0,
 
     remaining = remaining_classes(db, section_id, today=today, tz=tz)
     overall = can_miss(present, counted, remaining, threshold)
-    overall.update({"counted": counted, "present": present})
+    # "Attend N more classes in a row to reach the minimum" -- 0 when already there.
+    overall.update({"counted": counted, "present": present,
+                    "classes_needed": _classes_needed(present, counted, threshold)})
 
     for s in subjects:
         s_remaining = remaining_classes(db, section_id, today=today,
                                         subject_id=s["subject_id"], tz=tz)
         s["remaining"] = s_remaining
         s["projection"] = can_miss(s["present"], s["counted"], s_remaining, threshold)
+        s["projection"]["classes_needed"] = _classes_needed(s["present"], s["counted"], threshold)
 
     return {
         "threshold_pct": threshold,

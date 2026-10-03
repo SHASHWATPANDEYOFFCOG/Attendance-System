@@ -33,6 +33,8 @@ class Event:
     session_id: Optional[int] = None
     camera_id: Optional[int] = None
     at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    #: Set for personal events (notifications). Delivered ONLY to that user's own stream.
+    user_id: Optional[int] = None
 
     def to_sse(self) -> str:
         body = json.dumps({"at": self.at, "session_id": self.session_id,
@@ -53,9 +55,13 @@ class EventBus:
 
     # ----------------------------------------------------------- subscribing
 
-    def subscribe(self, session_id: Optional[int] = None) -> asyncio.Queue:
+    def subscribe(self, session_id: Optional[int] = None,
+                  user_id: Optional[int] = None) -> asyncio.Queue:
+        """`user_id` set: a personal stream receiving only that user's own events.
+        Unset: a staff session stream, which never receives anyone's personal events."""
         q: asyncio.Queue = asyncio.Queue(maxsize=MAX_QUEUE)
         q._session_filter = session_id            # type: ignore[attr-defined]
+        q._user_filter = user_id                  # type: ignore[attr-defined]
         with self._lock:
             self._subs.add(q)
         return q
@@ -77,6 +83,12 @@ class EventBus:
         with self._lock:
             subs = list(self._subs)
         for q in subs:
+            owner = getattr(q, "_user_filter", None)
+            if owner is not None or event.user_id is not None:
+                # Personal events go to their owner's stream and nowhere else, and a personal
+                # stream carries nothing but its owner's events.
+                if owner != event.user_id:
+                    continue
             wanted = getattr(q, "_session_filter", None)
             if wanted is not None and event.session_id is not None and event.session_id != wanted:
                 continue
@@ -114,9 +126,11 @@ bus = EventBus()
 
 
 def emit(kind: str, payload: Dict[str, Any], *, session_id: Optional[int] = None,
-         camera_id: Optional[int] = None, threadsafe: bool = True) -> Event:
+         camera_id: Optional[int] = None, user_id: Optional[int] = None,
+         threadsafe: bool = True) -> Event:
     """Convenience publisher used by the worker and the API."""
-    ev = Event(kind=kind, payload=payload, session_id=session_id, camera_id=camera_id)
+    ev = Event(kind=kind, payload=payload, session_id=session_id, camera_id=camera_id,
+               user_id=user_id)
     if threadsafe:
         bus.publish_threadsafe(ev)
     else:

@@ -104,12 +104,12 @@ from app.schemas import (
     UserOut,
 )
 from app.worker import clock_warning, registry
-from occlubio import load_config
+from app.runtime import cfg as runtime_cfg
 from occlubio.utils import get_logger
 
 log = get_logger("app.api")
 
-cfg = load_config()
+cfg = runtime_cfg          # one shared instance with app/routes/*
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 @asynccontextmanager
@@ -124,7 +124,11 @@ async def lifespan(_app: FastAPI):
     warn = clock_warning()
     if warn:
         log.warning("CLOCK: %s", warn)
+    from app.scheduler import scheduler
+
+    scheduler.start()
     yield
+    scheduler.stop()
     registry.stop_all()
 
 
@@ -262,7 +266,11 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             "code": "disabled", "message": "This account has been disabled."})
 
     student_status = _student_status(db, user)
-    if student_status == "pending" and user.email_verified_at is None:
+    # Only accounts that were actually sent a code must use it (the full sign-up flow); the
+    # legacy register form has no verification step and relies on staff approval alone.
+    from app.models import EmailOtp
+    was_sent_code = db.scalars(select(EmailOtp.id).where(EmailOtp.user_id == user.id)).first()
+    if student_status == "pending" and user.email_verified_at is None and was_sent_code:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
             "code": "email_unverified",
             "message": "Verify your email address before signing in.",
@@ -303,9 +311,25 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/register", response_model=UserOut, status_code=201)
-def register(body: RegisterIn, db: Session = Depends(get_db)):
-    """Public self-signup. Creates STUDENT accounts only — staff are created by an admin."""
-    return _create_user(db, body, Role.STUDENT)
+def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
+    """Legacy public self-signup used by web/login.html. Creates STUDENT accounts only.
+
+    The account starts PENDING, exactly like the full sign-up at /api/auth/signup: it can sign
+    in and see its status, but cannot be marked or mark attendance until staff approve it.
+    """
+    from app.models import StudentProfile
+    from app.notify import notify
+    from app.ratelimit import enforce
+    from app.scope import department_heads
+
+    enforce(request, "signup")
+    out = _create_user(db, body, Role.STUDENT)
+    db.add(StudentProfile(user_id=out.id, status="pending", roll_number=out.roll_number))
+    notify(db, department_heads(db, None), "registration_pending", "New student registration",
+           f"{out.display_name} registered without choosing a class and is waiting for "
+           f"approval.", link="/staff/approvals")
+    db.commit()
+    return _user_out(db.get(User, out.id))
 
 
 @app.post("/api/users", response_model=UserOut, status_code=201)
@@ -1189,6 +1213,18 @@ async def live_stream(request: Request, session_id: Optional[int] = None,
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ------------------------------------------------------------------ portal routers
+
+from app.routes import academic as _academic  # noqa: E402
+from app.routes import accounts as _accounts  # noqa: E402
+from app.routes import admin as _admin  # noqa: E402
+from app.routes import files as _files  # noqa: E402
+from app.routes import students as _students  # noqa: E402
+
+for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router):
+    app.include_router(_r)
 
 
 # ------------------------------------------------------------------ static

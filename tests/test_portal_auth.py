@@ -135,9 +135,13 @@ def test_pending_unverified_signup_cannot_sign_in(api, make_user):
     from app.db import SessionLocal
     from app.models import StudentProfile
 
+    from app.models import EmailOtp
+
     uid, _ = make_user("newbie", email="newbie@college.edu")
     db = SessionLocal()
     db.add(StudentProfile(user_id=uid, status="pending"))
+    db.add(EmailOtp(user_id=uid, code_hash="x$y",
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)))
     db.commit()
     db.close()
 

@@ -20,6 +20,10 @@ os.environ["ATTENDANCE_DB_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 os.environ["ATTENDANCE_JWT_SECRET"] = "test-secret-not-for-production-" + "0" * 32
 os.environ["ATTENDANCE_FERNET_KEY"] = Fernet.generate_key().decode()
 os.environ["ATTENDANCE_ENV"] = "test"
+# Jobs are driven explicitly by the tests that need them; no background threads, no real mail.
+os.environ["ATTENDANCE_DISABLE_BACKGROUND"] = "1"
+os.environ["ATTENDANCE_OUTBOX"] = str(_TMP / "outbox")
+os.environ["ATTENDANCE_UPLOAD_DIR"] = str(_TMP / "uploads")
 
 from occlubio import load_config  # noqa: E402
 
@@ -73,6 +77,9 @@ def api(monkeypatch):
     gs.invalidate()
     settings_service.invalidate()       # cached settings belong to the previous test's database
     limiter.reset()
+    import shutil
+
+    shutil.rmtree(os.environ["ATTENDANCE_OUTBOX"], ignore_errors=True)   # one test's mail only
 
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

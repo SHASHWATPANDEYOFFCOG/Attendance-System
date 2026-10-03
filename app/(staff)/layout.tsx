@@ -6,10 +6,11 @@
  */
 import { redirect } from "next/navigation";
 
-import { apiGet, getMe, isStaffRole } from "@/lib/api";
+import { apiGetAll, getMe, isStaffRole } from "@/lib/api";
 import { homeFor } from "@/lib/session";
-import { staffNav } from "@/lib/nav";
+import { staffNav, type Counts } from "@/lib/nav";
 import { AppShell } from "@/components/shell";
+import { NotificationBell } from "@/components/notification-bell";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +19,17 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   if (!me) redirect("/login");
   if (!isStaffRole(me.role)) redirect(homeFor(me.role));
 
-  const approvals = await apiGet<{ total: number }>("/api/approvals/summary").catch(() => null);
+  const raw = await apiGetAll({ approvals: "/api/approvals/summary", counts: "/api/notifications/counts" });
+  const approvals = raw.approvals as { total: number } | null;
+  const counts = (raw.counts ?? {}) as Counts;
 
   return (
-    <AppShell me={me} groups={staffNav(me.role, { approvals: approvals?.total })} portal="Authority portal">
+    <AppShell
+      me={me}
+      groups={staffNav(me.role, { ...counts, approvals: approvals?.total })}
+      portal="Authority portal"
+      topRight={<NotificationBell initial={counts.notifications ?? 0} allHref="/staff/notifications" />}
+    >
       {children}
     </AppShell>
   );

@@ -4,11 +4,13 @@
  */
 import type { NavGroup } from "@/components/shell-nav";
 
-export type Counts = Partial<Record<"approvals" | "notifications" | "messages" | "leaves" | "issues" | "review", number>>;
+export type Counts = Partial<Record<
+  "approvals" | "notifications" | "messages" | "announcements" | "leaves" | "issues" | "review", number
+>>;
 
 export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
   const admin = role === "admin" || role === "super_admin";
-  const groups: NavGroup[] = [
+  return [
     {
       items: [
         { href: "/dashboard", label: "Dashboard", exact: true },
@@ -22,29 +24,53 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
       items: [
         { href: "/staff/students", label: "Directory" },
         { href: "/staff/approvals", label: "Approvals", badge: counts.approvals },
+        { href: "/staff/leaves", label: "Leave", badge: counts.leaves },
+        { href: "/staff/issues", label: "Issues", badge: counts.issues },
+      ],
+    },
+    {
+      title: "Communicate",
+      items: [
+        { href: "/staff/messages", label: "Messages", badge: counts.messages },
+        { href: "/staff/announcements", label: "Notice board" },
+        { href: "/staff/notifications", label: "Notifications", badge: counts.notifications },
       ],
     },
     { title: "Setup", items: [{ href: "/staff/setup", label: "Academic setup" }] },
+    {
+      title: "Administration",
+      items: [
+        ...(admin ? [{ href: "/staff/admin/users", label: "Staff & roles" }] : []),
+        { href: "/staff/admin/settings", label: "Settings" },
+        ...(role === "super_admin" ? [{ href: "/staff/admin/audit", label: "Audit log" }] : []),
+      ],
+    },
   ];
-  const adminItems = [
-    ...(admin ? [{ href: "/staff/admin/users", label: "Staff & roles" }] : []),
-    { href: "/staff/admin/settings", label: "Settings" },
-    ...(role === "super_admin" ? [{ href: "/staff/admin/audit", label: "Audit log" }] : []),
-  ];
-  groups.push({ title: "Administration", items: adminItems });
-  return groups;
 }
 
 export function studentNav(counts: Counts = {}): NavGroup[] {
-  void counts;
   return [
     {
       items: [
         { href: "/student", label: "Dashboard", exact: true },
         { href: "/student/mark", label: "Mark attendance" },
         { href: "/student/history", label: "History" },
-        { href: "/student/profile", label: "My profile" },
       ],
     },
+    {
+      title: "Requests",
+      items: [
+        { href: "/student/leaves", label: "Leave" },
+        { href: "/student/issues", label: "Issues & queries" },
+      ],
+    },
+    {
+      title: "Inbox",
+      items: [
+        { href: "/student/messages", label: "Messages", badge: (counts.messages ?? 0) + (counts.announcements ?? 0) || undefined },
+        { href: "/student/notifications", label: "Notifications", badge: counts.notifications },
+      ],
+    },
+    { title: "Account", items: [{ href: "/student/profile", label: "My profile" }] },
   ];
 }

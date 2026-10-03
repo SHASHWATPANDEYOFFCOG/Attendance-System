@@ -155,6 +155,7 @@ def enroll_user(
     cfg,
     pipeline: PipelineService,
     actor_is_staff: bool = False,
+    status: str = "approved",
 ) -> EnrollmentOutcome:
     """Build and store one averaged face template for `user`.
 
@@ -214,9 +215,15 @@ def enroll_user(
             )
 
     qualities = [r.quality for r in results if r.accepted]
-    for old in db.scalars(select(Enrollment).where(Enrollment.user_id == user.id,
-                                                   Enrollment.is_active.is_(True))):
-        old.is_active = False               # supersede, keep the row for the audit trail
+    if status == "approved":
+        for old in db.scalars(select(Enrollment).where(Enrollment.user_id == user.id,
+                                                       Enrollment.is_active.is_(True))):
+            old.is_active = False           # supersede, keep the row for the audit trail
+    else:
+        # A self-captured template waits for a teacher; the live one keeps working meanwhile.
+        for old in db.scalars(select(Enrollment).where(Enrollment.user_id == user.id,
+                                                       Enrollment.status == "pending")):
+            db.delete(old)
 
     row = Enrollment(
         user_id=user.id,
@@ -226,6 +233,7 @@ def enroll_user(
         mean_quality=float(np.mean(qualities)),
         min_quality=float(np.min(qualities)),
         is_active=True,
+        status=status,
     )
     db.add(row)
     db.commit()

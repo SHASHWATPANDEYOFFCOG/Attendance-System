@@ -371,6 +371,8 @@ def me(user: User = Depends(current_user)):
 def set_consent(body: ConsentIn, db: Session = Depends(get_db),
                 user: User = Depends(current_user)):
     """Record or withdraw biometric consent. Enrollment is refused while this is false."""
+    if not body.consent_given and user.consent_given:
+        svc.erase_biometrics(db, user, cfg, user)        # withdrawal deletes the face data
     user.consent_given = bool(body.consent_given)
     user.consent_at = utcnow() if body.consent_given else None
     user.consent_text_version = body.consent_text_version if body.consent_given else None
@@ -400,7 +402,8 @@ async def enroll(
     images = [(f.filename or f"upload_{i}.jpg", await f.read()) for i, f in enumerate(files)]
     try:
         outcome = enroll_user(db, target, images, cfg, get_pipeline(cfg),
-                              actor_is_staff=is_staff(actor))
+                              actor_is_staff=is_staff(actor),
+                              status="approved" if is_staff(actor) else "pending")
     except EnrollmentError as exc:
         raise HTTPException(exc.code, detail={"message": exc.message, **exc.extra})
 
@@ -1227,6 +1230,7 @@ from app.routes import academic as _academic  # noqa: E402
 from app.routes import accounts as _accounts  # noqa: E402
 from app.routes import admin as _admin  # noqa: E402
 from app.routes import files as _files  # noqa: E402
+from app.routes import face as _face  # noqa: E402
 from app.routes import issues as _issues  # noqa: E402
 from app.routes import leaves as _leaves  # noqa: E402
 from app.routes import messaging as _messaging  # noqa: E402
@@ -1236,7 +1240,7 @@ from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
            _sessions.router, _leaves.router, _issues.router, _messaging.router,
-           _notifications.router):
+           _notifications.router, _face.router):
     app.include_router(_r)
 
 

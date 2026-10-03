@@ -84,10 +84,16 @@ class UserOut(BaseModel):
 
 
 class CameraIn(BaseModel):
-    name: str
-    room: str
-    source: str
+    name: str = Field(min_length=1, max_length=80)
+    room: str = Field(min_length=1, max_length=80)
+    #: "0" for a local webcam, or rtsp:// / http:// stream address WITHOUT credentials.
+    source: str = Field(min_length=1, max_length=512)
     mode: str = "kiosk"
+    #: Stored encrypted; never returned by any endpoint.
+    username: Optional[str] = Field(None, max_length=120)
+    password: Optional[str] = Field(None, max_length=200)
+    enabled: bool = True
+    auto_start: bool = True
 
 
 class CameraOut(BaseModel):
@@ -101,6 +107,9 @@ class CameraOut(BaseModel):
     last_heartbeat: Optional[datetime] = None
     measured_fps: float = 0.0
     running: bool = False
+    enabled: bool = True
+    auto_start: bool = False
+    has_credentials: bool = False
 
 
 class SessionIn(BaseModel):

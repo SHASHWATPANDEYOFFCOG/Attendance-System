@@ -16,10 +16,23 @@ Design notes that matter operationally:
   still open its `last_seen`/`frames_matched` are still being written — that is construction,
   not mutation of a settled fact.
 * **A camera that quietly died looks exactly like a room full of absent students.** Hence
-  heartbeats, an explicit `offline` status, backoff reconnection and a disk spool.
+  heartbeats, an explicit `offline` status, backoff reconnection, a disk spool, and an alert to
+  the teacher and HOD when it happens during a lecture.
+
+Smart-attendance rules (portal):
+
+* **Recognition runs only during a session in the camera's room**, and a face is matched ONLY
+  against that session's roster (its class group), never the whole college.
+* **Confirmed -> the student is marked** Present/Late by the same time windows as every other
+  method (`record_mark`, source `cctv`). A confirmation after the late window, an ambiguous
+  track, or a near-threshold track that never confirmed goes to the teacher's review queue with
+  an encrypted face crop, auto-deleted after the retention period.
+* **Unknown faces are ignored and never stored.** Frames are processed in memory; no video and
+  no unknown-face image is ever written.
 """
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 import threading
@@ -36,13 +49,16 @@ from sqlalchemy import select
 from app.bus import emit
 from app.confirm import ConfirmationManager, Decision, EventKind, Observation
 from app.db import SessionLocal
-from app.gallery_service import get_gallery, search_top1
+from app.cctv import save_review_crop, stream_url
+from app.gallery_service import match_among, user_templates
 from app.models import (
+    CaptureMethod,
     Camera,
     CameraStatus,
     ClassSession,
+    ReviewItem,
+    SessionState,
     Sighting,
-    UnknownSighting,
     User,
     utcnow,
 )
@@ -124,6 +140,16 @@ class _LatestFrame:
         self._cap.release()
 
 
+class _NearEvidence:
+    """Minimal evidence for a review item built from review-band scores."""
+
+    def __init__(self, scores: List[float]) -> None:
+        ordered = sorted(scores)
+        self.frames_matched = len(scores)
+        self.max_confidence = max(scores)
+        self.median_confidence = ordered[len(ordered) // 2]
+
+
 # ---------------------------------------------------------------- the worker
 
 class CameraWorker(threading.Thread):
@@ -148,6 +174,10 @@ class CameraWorker(threading.Thread):
         self.store_thumbnails = bool(a.store_thumbnails)
         self.spool = Path(str(a.event_buffer_path))
         self.thumb_dir = Path("var") / "thumbs"
+        # Seconds between analysed frames; None = read from admin settings at start.
+        self.interval_s: Optional[float] = getattr(a, "cctv_frame_interval_s", None)
+        self._roster: Tuple[Optional[int], float, Dict[int, np.ndarray]] = (None, 0.0, {})
+        self._track_chips: Dict[int, np.ndarray] = {}
 
     # ------------------------------------------------------------ lifecycle
 
@@ -164,6 +194,7 @@ class CameraWorker(threading.Thread):
 
             if not self._antispoof_ok(db, cam):
                 return
+            self.cfg = self._effective_cfg(db)
 
             attempt = 0
             while not self._stopping.is_set():
@@ -175,9 +206,12 @@ class CameraWorker(threading.Thread):
                     if self._stopping.wait(delay):
                         break
 
-                cap = self._open(cam.source)
+                # Credentials are decrypted into the URL here, in memory, and nowhere else.
+                cap = self._open(stream_url(cam))
                 if cap is None or not cap.isOpened():
-                    self.last_error = f"cannot open source: {cam.source}"
+                    from app.cctv import mask_source
+
+                    self.last_error = f"cannot open source: {mask_source(cam.source)}"
                     attempt += 1
                     continue
 
@@ -193,6 +227,30 @@ class CameraWorker(threading.Thread):
             self._set_status(db, cam, CameraStatus.STOPPED, "stopped")
         finally:
             db.close()
+
+    def _effective_cfg(self, db):
+        """The YAML config with the admin's live CCTV settings applied on top."""
+        from app import settings_service
+
+        cfg = copy.deepcopy(self.cfg)
+        s = settings_service.all_settings(db, cfg)
+        cfg.gallery.match_threshold = float(s["face_match_threshold"])
+        cfg.gallery.review_threshold = float(s["face_review_threshold"])
+        cfg.attendance.confirm_frames = int(s["cctv_confirm_frames"])
+        if self.interval_s is None:
+            self.interval_s = float(s["cctv_frame_interval_s"])
+        return cfg
+
+    def _roster_templates(self, db, session: ClassSession) -> Dict[int, np.ndarray]:
+        """Approved templates of the students on this session's roster (cached ~60 s)."""
+        from app.session_service import approved_roster
+
+        sid, at, cached = self._roster
+        if sid == session.id and time.monotonic() - at < 60:
+            return cached
+        tpl = user_templates(db, self.cfg, approved_roster(db, session))
+        self._roster = (session.id, time.monotonic(), tpl)
+        return tpl
 
     def _antispoof_ok(self, db, cam: Camera) -> bool:
         """B9: in `strict` mode a live camera refuses to run without PAD weights."""
@@ -240,12 +298,15 @@ class CameraWorker(threading.Thread):
         )
         manager = ConfirmationManager(self.cfg)
         open_sightings: Dict[int, int] = {}       # track_id -> sightings.id
+        near: Dict[Tuple[int, int], List[float]] = {}   # (track, user) -> review-band scores
         track_users: Dict[int, int] = {}          # track_id -> user_id
         unknown_emitted: set[int] = set()
 
         frame_no = 0
         last_beat = 0.0
         last_ts = 0.0
+        last_processed = 0.0
+        current_session: Optional[int] = None
         fps_ema: Optional[float] = None
         timeout = float(self.cfg.attendance.frame_grab_timeout_s)
 
@@ -272,8 +333,27 @@ class CameraWorker(threading.Thread):
                 if frame_no % self.stride:
                     continue
 
+                if self.interval_s and now_mono - last_processed < self.interval_s:
+                    continue
+                last_processed = now_mono
+
                 t_start = time.perf_counter()
                 session = self._resolve_session(db, cam)
+                if session is None or session.state == SessionState.CLOSED.value:
+                    # No lecture here now: nobody is looked for, nothing is matched or kept.
+                    if now_mono - last_beat > self.heartbeat_interval_s:
+                        last_beat = now_mono
+                        self._beat(db, cam)
+                    continue
+                if session.id != current_session:
+                    # A new lecture starts a clean slate: no track carries over between classes.
+                    current_session = session.id
+                    manager = ConfirmationManager(self.cfg)
+                    open_sightings.clear()
+                    track_users.clear()
+                    near.clear()
+                    self._track_chips.clear()
+                templates = self._roster_templates(db, session)
                 faces = pipeline.detect(frame)[: self.max_faces]
                 faces = tracker.update(faces)
 
@@ -289,11 +369,13 @@ class CameraWorker(threading.Thread):
 
                     chip = pipeline.align(frame, face)
                     passed, quality, occ, spoof = pipeline.assess(chip, face.det_score)
-                    gallery = get_gallery(db, self.cfg)
                     user_id, score = (None, 0.0)
                     if passed:
                         emb = pipeline.embed(frame, face, chip)
-                        user_id, score = search_top1(gallery, emb)
+                        # Only this class's students are candidates.
+                        user_id, score = match_among(emb, templates)
+                        if user_id is not None:
+                            self._track_chips[tid] = chip      # in memory, for a review crop
 
                     obs = Observation(
                         ts=ts,
@@ -306,6 +388,18 @@ class CameraWorker(threading.Thread):
                         occluded_ratio=float(occ.get("occluded_ratio", 0.0)),
                     )
                     decision = manager.observe(tid, obs)
+                    # A student who stays in view but never clears the match threshold would
+                    # otherwise reach the teacher only when they leave. Once there is as much
+                    # near-match evidence as a confirmation needs, ask the teacher now.
+                    lo = float(self.cfg.gallery.review_threshold)
+                    hi = float(self.cfg.gallery.match_threshold)
+                    if user_id is not None and lo <= score < hi and not manager.is_confirmed(tid):
+                        scores = near.setdefault((tid, user_id), [])
+                        scores.append(score)
+                        if len(scores) == int(self.cfg.attendance.confirm_frames):
+                            ev_near = _NearEvidence(scores)
+                            self._review(db, cam, session, user_id, ev_near, chip,
+                                         "near match below the confidence threshold")
                     if decision is not None:
                         self._handle(db, cam, session, decision, chip, track_users,
                                      open_sightings, unknown_emitted)
@@ -347,9 +441,12 @@ class CameraWorker(threading.Thread):
         if d.kind is EventKind.CHECKIN and ev is not None and ev.identity:
             user_id = int(ev.identity)
             track_users[d.track_id] = user_id
-            row = self._write_sighting(db, cam, session, d, ev, user_id, chip, confirmed=True)
+            row = self._write_sighting(db, cam, session, d, ev, user_id, None, confirmed=True)
             if row is not None:
                 open_sightings[d.track_id] = row.id
+            if session is not None and session.capture_method != CaptureMethod.FACE.value:
+                self._mark(db, cam, session, user_id, ev, chip if chip is not None
+                           else self._track_chips.get(d.track_id))
             user = db.get(User, user_id)
             emit("checkin", {
                 "track_id": d.track_id,
@@ -368,8 +465,12 @@ class CameraWorker(threading.Thread):
 
         if d.kind in (EventKind.AMBIGUOUS, EventKind.SPOOF_SUSPECTED) and ev is not None:
             if ev.identity and ev.identity.isdigit():
-                self._write_sighting(db, cam, session, d, ev, int(ev.identity), chip,
+                self._write_sighting(db, cam, session, d, ev, int(ev.identity), None,
                                      confirmed=False)
+                if session is not None:
+                    self._review(db, cam, session, int(ev.identity), ev,
+                                 chip if chip is not None else self._track_chips.get(d.track_id),
+                                 ev.review_reason or d.kind.value.replace("_", " "))
             emit(d.kind.value, {
                 "track_id": d.track_id,
                 "user_id": int(ev.identity) if ev.identity and ev.identity.isdigit() else None,
@@ -378,20 +479,23 @@ class CameraWorker(threading.Thread):
             return
 
         if d.kind is EventKind.UNKNOWN_FACE and d.track_id not in unknown_emitted:
+            # Not a student of this class: ignored, and nothing about it is stored.
             unknown_emitted.add(d.track_id)
-            self._write_unknown(db, cam, session, d, chip)
-            emit("unknown_face", {
-                "track_id": d.track_id,
-                "best_score": round(ev.max_confidence, 4) if ev else 0.0,
-                "detail": "never auto-assigned — an authority must resolve this",
-            }, session_id=sid, camera_id=cam.id)
+            self._track_chips.pop(d.track_id, None)
+            emit("unknown_face", {"track_id": d.track_id,
+                                  "detail": "not matched to this class; ignored, not stored"},
+                 session_id=sid, camera_id=cam.id)
             return
 
         if d.kind is EventKind.DISCARDED:
             open_sightings.pop(d.track_id, None)
+            crop = self._track_chips.pop(d.track_id, None)
             if ev is not None and ev.identity and ev.identity.isdigit() and ev.frames_matched:
-                self._write_sighting(db, cam, session, d, ev, int(ev.identity), chip,
+                self._write_sighting(db, cam, session, d, ev, int(ev.identity), None,
                                      confirmed=False)
+                if session is not None and ev.needs_review:
+                    self._review(db, cam, session, int(ev.identity), ev, crop,
+                                 "near match that never confirmed")
 
     # --------------------------------------------------------- persistence
 
@@ -431,6 +535,59 @@ class CameraWorker(threading.Thread):
                          "at": utcnow().isoformat()})
             return None
 
+    def _mark(self, db, cam: Camera, session: ClassSession, user_id: int, ev,
+              chip: Optional[np.ndarray]) -> None:
+        """A confirmed student is marked Present/Late; after the late window, a human decides."""
+        from app.session_service import record_mark, window_status
+
+        user = db.get(User, user_id)
+        if user is None:
+            return
+        status = window_status(session, utcnow(), db, self.cfg)
+        if status is None:
+            self._review(db, cam, session, user_id, ev, chip, "seen after the late window")
+            return
+        try:
+            record_mark(db, session, user, CaptureMethod.CCTV.value, self.cfg, status=status,
+                        confidence=float(ev.median_confidence),
+                        evidence=f"camera {cam.name}: {ev.frames_matched} agreeing frames, "
+                                 f"median {ev.median_confidence:.3f}")
+        except Exception as exc:                     # noqa: BLE001 - never kill the camera
+            db.rollback()
+            log.error("could not mark user %s from camera %s: %s", user_id, cam.name, exc)
+
+    def _review(self, db, cam: Camera, session: ClassSession, user_id: int, ev,
+                chip: Optional[np.ndarray], reason: str) -> None:
+        """Queue a near match for the teacher, once per student per session."""
+        from sqlalchemy import select as _select
+
+        from app.models import AttendanceRecordRow
+
+        try:
+            if db.scalars(_select(AttendanceRecordRow.id).where(
+                    AttendanceRecordRow.session_id == session.id,
+                    AttendanceRecordRow.user_id == user_id)).first() is not None:
+                return                                  # already marked: nothing to decide
+            existing = db.scalars(_select(ReviewItem).where(
+                ReviewItem.session_id == session.id, ReviewItem.user_id == user_id,
+                ReviewItem.status == "pending")).first()
+            score = float(ev.max_confidence or ev.median_confidence or 0.0)
+            if existing is not None:
+                if score > existing.score:
+                    existing.score, existing.frames = score, int(ev.frames_matched)
+                db.commit()
+                return
+            item = ReviewItem(session_id=session.id, user_id=user_id, camera_id=cam.id,
+                              score=score, frames=int(ev.frames_matched), seen_at=utcnow(),
+                              snapshot_path=save_review_crop(chip), reason=reason[:200])
+            db.add(item)
+            db.commit()
+            emit("review_item", {"user_id": user_id, "score": round(score, 3), "reason": reason},
+                 session_id=session.id, camera_id=cam.id)
+        except Exception as exc:                     # noqa: BLE001
+            db.rollback()
+            log.error("could not queue review item: %s", exc)
+
     def _extend_sighting(self, db, sighting_id: Optional[int]) -> None:
         """Grow an open track's presence window. Finalized when the track closes."""
         if sighting_id is None:
@@ -444,26 +601,6 @@ class CameraWorker(threading.Thread):
             db.commit()
         except Exception:
             db.rollback()
-
-    def _write_unknown(self, db, cam: Camera, session: Optional[ClassSession],
-                       d: Decision, chip: Optional[np.ndarray]) -> None:
-        ev = d.evidence
-        row = UnknownSighting(
-            session_id=session.id if session else None,
-            camera_id=cam.id,
-            track_id=d.track_id,
-            first_seen=utcnow() - timedelta(seconds=max(ev.span_seconds if ev else 0.0, 0.0)),
-            last_seen=utcnow(),
-            best_score=ev.max_confidence if ev else 0.0,
-            frames=ev.frames_matched if ev else 0,
-            thumbnail_path=self._save_thumb(chip),
-        )
-        try:
-            db.add(row)
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            log.error("unknown-sighting write failed: %s", exc)
 
     def _save_thumb(self, chip: Optional[np.ndarray]) -> Optional[str]:
         if chip is None or not self.store_thumbnails:
@@ -564,6 +701,10 @@ class CameraWorker(threading.Thread):
             cam.status = status
             cam.status_detail = detail[:300]
             cam.last_heartbeat = utcnow()
+            if status in (CameraStatus.OFFLINE, CameraStatus.ERROR):
+                alert_camera_offline(db, cam, detail)
+            elif status == CameraStatus.RUNNING:
+                cam.offline_alerted_at = None
             db.commit()
             emit("camera_status", {"camera_id": cam.id, "name": cam.name,
                                    "status": status.value, "detail": detail,
@@ -571,6 +712,29 @@ class CameraWorker(threading.Thread):
                  camera_id=cam.id)
         except Exception:
             db.rollback()
+
+
+def alert_camera_offline(db, cam: Camera, detail: str) -> bool:
+    """Tell the teacher(s) of the lecture in this room, and the HOD, once per outage."""
+    if cam.offline_alerted_at is not None:
+        return False
+    now = utcnow()
+    session = db.scalars(select(ClassSession).where(
+        ClassSession.room == cam.room, ClassSession.state == SessionState.ACTIVE.value,
+        ClassSession.scheduled_start <= now, ClassSession.scheduled_end >= now)).first()
+    if session is None:
+        return False
+    from app.notify import notify
+    from app.scope import department_heads, section_department_id, section_teachers
+
+    who = {session.owner_id} | section_teachers(db, session.section_id)
+    who |= department_heads(db, section_department_id(db, session.section_id))
+    notify(db, who, "camera_offline", f"Camera offline: {cam.name}",
+           f"The camera in {cam.room} went offline during {session.title} ({detail[:120]}). "
+           f"Students can still mark with the classroom code or selfie, or mark them by hand.",
+           link=f"/staff/sessions/{session.id}", email=True)
+    cam.offline_alerted_at = now
+    return True
 
 
 # ------------------------------------------------------------------ registry

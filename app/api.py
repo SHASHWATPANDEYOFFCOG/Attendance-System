@@ -166,10 +166,14 @@ def _camera_out(c: Camera) -> CameraOut:
     status_val = c.status.value if isinstance(c.status, CameraStatus) else str(c.status)
     if stale and status_val == CameraStatus.RUNNING.value:
         status_val = CameraStatus.OFFLINE.value
+    from app.cctv import mask_source
+
     return CameraOut(
-        id=c.id, name=c.name, room=c.room, source=c.source, mode=c.mode,
+        id=c.id, name=c.name, room=c.room, source=mask_source(c.source), mode=c.mode,
         status=status_val, status_detail=c.status_detail, last_heartbeat=c.last_heartbeat,
         measured_fps=c.measured_fps, running=registry.is_running(c.id),
+        enabled=c.enabled, auto_start=c.auto_start,
+        has_credentials=bool(c.username_encrypted or c.password_encrypted),
     )
 
 
@@ -442,7 +446,16 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_staff),
 @app.post("/api/cameras", response_model=CameraOut, status_code=201)
 def create_camera(body: CameraIn, db: Session = Depends(get_db),
                   _: User = Depends(require_admin)):
-    cam = Camera(name=body.name, room=body.room, source=body.source, mode=body.mode)
+    from app.cctv import mask_source
+    from app.crypto import encrypt_text
+
+    if mask_source(body.source) != body.source:
+        raise HTTPException(422, "Put the username and password in their own fields, not in the "
+                                 "stream address — they are stored encrypted that way.")
+    cam = Camera(name=body.name.strip(), room=body.room.strip(), source=body.source.strip(),
+                 mode=body.mode, enabled=body.enabled, auto_start=body.auto_start,
+                 username_encrypted=encrypt_text(body.username) if body.username else None,
+                 password_encrypted=encrypt_text(body.password) if body.password else None)
     db.add(cam)
     try:
         db.commit()
@@ -1230,6 +1243,7 @@ from app.routes import academic as _academic  # noqa: E402
 from app.routes import accounts as _accounts  # noqa: E402
 from app.routes import admin as _admin  # noqa: E402
 from app.routes import files as _files  # noqa: E402
+from app.routes import cameras as _cameras  # noqa: E402
 from app.routes import face as _face  # noqa: E402
 from app.routes import issues as _issues  # noqa: E402
 from app.routes import leaves as _leaves  # noqa: E402
@@ -1240,7 +1254,7 @@ from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
            _sessions.router, _leaves.router, _issues.router, _messaging.router,
-           _notifications.router, _face.router):
+           _notifications.router, _face.router, _cameras.router):
     app.include_router(_r)
 
 

@@ -979,6 +979,7 @@ class ReviewItem(Base):
     frames: Mapped[int] = mapped_column(Integer, default=1)
     seen_at: Mapped[datetime] = mapped_column(UTCDateTime)
     snapshot_path: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default=ReviewStatus.PENDING.value)
     decided_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)

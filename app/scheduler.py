@@ -103,6 +103,30 @@ def _weekly_digest(db) -> None:
     run(db, cfg)
 
 
+def _cameras(db) -> None:
+    from app.camera_manager import tick as camera_tick
+    from app.runtime import cfg
+
+    camera_tick(db, cfg)
+
+
+def _retention(db) -> None:
+    """Hourly: delete review crops and recognition thumbnails past their retention period."""
+    import copy
+
+    from app import attendance_service, settings_service
+    from app.routes.cameras import purge_review_snapshots
+    from app.runtime import cfg
+
+    s = settings_service.all_settings(db, cfg)
+    purge_review_snapshots(db, int(s["review_retention_days"]))
+    c = copy.deepcopy(cfg)
+    c.attendance.retention_days = int(s["thumbnail_retention_days"])
+    attendance_service.run_retention(db, c, None)
+
+
 scheduler.add("email", 5.0, _dispatch_emails)
 scheduler.add("sessions", 30.0, _sessions)
 scheduler.add("weekly_digest", 600.0, _weekly_digest)
+scheduler.add("cameras", 20.0, _cameras)
+scheduler.add("retention", 3600.0, _retention)

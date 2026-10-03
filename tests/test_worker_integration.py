@@ -156,6 +156,8 @@ def live_cfg(cfg):
     itself a requirement and has its own test below.
     """
     cfg.attendance.antispoof_mode = "permissive"
+    # Analyse every frame of the short fake stream (production uses the admin's interval).
+    cfg.attendance.cctv_frame_interval_s = 0
     return cfg
 
 
@@ -365,8 +367,13 @@ def test_disk_spool_replays_after_a_database_outage(api, live_cfg, two_enrolled,
     assert not spool.exists(), "spool should be cleared once flushed"
 
 
-def test_unscheduled_checkin_when_no_session_is_active(api, live_cfg, monkeypatch, two_enrolled):
-    """No scheduled session -> session_id NULL. The worker must never guess a session."""
+def test_nobody_is_recognised_outside_a_scheduled_session(api, live_cfg, monkeypatch,
+                                                         two_enrolled):
+    """No lecture in the room -> the camera looks for nobody and stores nothing.
+
+    Spec change (Smart Attendance): recognition runs only during a session, against that
+    session's class. Previously an out-of-hours face became an "unscheduled" sighting.
+    """
     db = SessionLocal()
     try:
         s = db.get(ClassSession, two_enrolled["session_id"])
@@ -377,13 +384,12 @@ def test_unscheduled_checkin_when_no_session_is_active(api, live_cfg, monkeypatc
         db.close()
 
     pipeline = ScriptedPipeline(two_enrolled["templates"])
-    run_worker(monkeypatch, live_cfg, two_enrolled["camera_id"], pipeline, FakeCapture)
+    run_worker(monkeypatch, live_cfg, two_enrolled["camera_id"], pipeline, FakeCapture,
+               seconds=3.0)
 
     db = SessionLocal()
     try:
-        confirmed = db.query(Sighting).filter(Sighting.confirmed.is_(True)).all()
-        assert confirmed, "no check-ins were recorded at all"
-        assert all(s.session_id is None for s in confirmed), \
-            "an out-of-hours check-in was attached to a scheduled session"
+        assert db.query(Sighting).count() == 0, "a face was recorded with no lecture running"
+        assert db.get(Camera, two_enrolled["camera_id"]).last_heartbeat is not None
     finally:
         db.close()

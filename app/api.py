@@ -848,7 +848,23 @@ def _scope_or_403(actor: User, requested: Optional[int]) -> Optional[int]:
 
 
 def _threshold() -> float:
-    return float(getattr(cfg.attendance, "min_attendance_pct", 75.0))
+    """The minimum attendance % the admin set (falls back to the YAML default)."""
+    from app import settings_service
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return float(settings_service.get(db, cfg, "min_attendance_pct"))
+    finally:
+        db.close()
+
+
+def _sections(actor: User, db: Session):
+    """Class scope for a teacher (the sections they teach); None for HOD / admin."""
+    from app.auth import is_faculty
+    from app.scope import taught_section_ids
+
+    return taught_section_ids(db, actor) if is_faculty(actor) else None
 
 
 @app.get("/api/timetable/today")
@@ -873,7 +889,8 @@ def report_defaulters(threshold: Optional[float] = None, department_id: Optional
     """Students below the minimum. Computed in SQL and returned worst-first."""
     scope = _scope_or_403(actor, department_id)
     rows = analytics.defaulters(db, threshold=threshold or _threshold(),
-                                department_id=scope, section_id=section_id, limit=limit)
+                                department_id=scope, section_id=section_id, limit=limit,
+                                section_ids=_sections(actor, db))
     return {"threshold_pct": threshold or _threshold(), "count": len(rows), "defaulters": rows}
 
 
@@ -912,9 +929,10 @@ def report_attendance(
     scope = _scope_or_403(actor, department_id)
     filters = _filters_from_query(date_from, date_to, department_id, section_id, subject_id,
                                   faculty_id, student_id, status, search)
-    total = reports.count_records(db, filters, scope)
+    secs = _sections(actor, db)
+    total = reports.count_records(db, filters, scope, secs)
     rows = reports.query_records(db, filters, scope, page=page, page_size=page_size,
-                                 tz=str(cfg.attendance.timezone))
+                                 tz=str(cfg.attendance.timezone), section_ids=secs)
     size = max(1, min(reports.MAX_PAGE_SIZE, page_size))
     return {
         "rows": rows,
@@ -947,6 +965,9 @@ def report_options(db: Session = Depends(get_db), actor: User = Depends(require_
     sec_stmt = select(Section, Program).join(Program, Program.id == Section.program_id)
     if scope is not None:
         sec_stmt = sec_stmt.where(Program.department_id == scope)
+    secs = _sections(actor, db)
+    if secs is not None:
+        sec_stmt = sec_stmt.where(Section.id.in_(list(secs) or [-1]))
     sections = [
         {"id": s.id, "label": f"{p.name} Y{s.year}S{s.semester}-{s.name}"}
         for s, p in db.execute(sec_stmt).all()
@@ -971,7 +992,8 @@ def report_daily_absentees(date: Optional[str] = None, section_id: Optional[int]
     on = _date.fromisoformat(date) if date else local_today(tz_of(cfg))
     scope = department_scope(actor)
     rows = reports.daily_absentees(db, on, scope, section_id=section_id,
-                                   tz=str(cfg.attendance.timezone))
+                                   tz=str(cfg.attendance.timezone),
+                                   section_ids=_sections(actor, db))
     return {"date": on.isoformat(), "count": len(rows), "absentees": rows}
 
 
@@ -998,7 +1020,8 @@ def export_report(
     filters = _filters_from_query(date_from, date_to, department_id, section_id, subject_id,
                                   faculty_id, student_id, status, search)
 
-    total = reports.count_records(db, filters, scope)
+    secs = _sections(actor, db)
+    total = reports.count_records(db, filters, scope, secs)
     limit = reports.EXPORT_ROW_LIMITS[fmt]
     if total > limit:
         hint = ("narrow the filters, or export XLSX/CSV which have no practical row limit"
@@ -1010,7 +1033,7 @@ def export_report(
         })
 
     rows = reports.query_records(db, filters, scope, limit=limit,
-                                 tz=str(cfg.attendance.timezone))
+                                 tz=str(cfg.attendance.timezone), section_ids=secs)
     render, media_type, ext = reports.EXPORTERS[fmt]
     org = str(getattr(cfg.attendance, "organisation", "Attendance Register"))
     payload = render(rows, org, filters, total, str(cfg.attendance.timezone))
@@ -1033,7 +1056,8 @@ def export_report(
 def analytics_summary(department_id: Optional[int] = None, db: Session = Depends(get_db),
                       actor: User = Depends(require_staff)):
     scope = _scope_or_403(actor, department_id)
-    return analytics.org_summary(db, department_id=scope, threshold=_threshold())
+    return analytics.org_summary(db, department_id=scope, threshold=_threshold(),
+                                 section_ids=_sections(actor, db))
 
 
 @app.get("/api/analytics/trend")
@@ -1042,15 +1066,16 @@ def analytics_trend(days: int = 30, department_id: Optional[int] = None,
     """One aligned series per department, for the trend chart."""
     scope = _scope_or_403(actor, department_id)
     ids = [scope] if scope is not None else None
-    return analytics.trend_by_department(db, days=days, department_ids=ids)
+    return analytics.trend_by_department(db, days=days, department_ids=ids,
+                                         section_ids=_sections(actor, db))
 
 
 @app.get("/api/analytics/weekday")
 def analytics_weekday(days: int = 90, department_id: Optional[int] = None,
                       db: Session = Depends(get_db), actor: User = Depends(require_staff)):
     scope = _scope_or_403(actor, department_id)
-    return {"days": days, "profile": analytics.weekday_profile(db, days=days,
-                                                               department_id=scope)}
+    return {"days": days, "profile": analytics.weekday_profile(
+        db, days=days, department_id=scope, section_ids=_sections(actor, db))}
 
 
 # ---------------------------------------------------------------- dashboard
@@ -1249,12 +1274,13 @@ from app.routes import issues as _issues  # noqa: E402
 from app.routes import leaves as _leaves  # noqa: E402
 from app.routes import messaging as _messaging  # noqa: E402
 from app.routes import notifications as _notifications  # noqa: E402
+from app.routes import reports_ext as _reports_ext  # noqa: E402
 from app.routes import sessions as _sessions  # noqa: E402
 from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
            _sessions.router, _leaves.router, _issues.router, _messaging.router,
-           _notifications.router, _face.router, _cameras.router):
+           _notifications.router, _face.router, _cameras.router, _reports_ext.router):
     app.include_router(_r)
 
 

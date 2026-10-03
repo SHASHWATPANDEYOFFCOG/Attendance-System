@@ -93,7 +93,8 @@ def _effective():
     return func.coalesce(AttendanceRecordRow.overridden_status, AttendanceRecordRow.status)
 
 
-def _base_query(filters: ReportFilters, department_scope: Optional[int]) -> Select:
+def _base_query(filters: ReportFilters, department_scope: Optional[int],
+                section_ids=None) -> Select:
     stmt = (
         select(
             AttendanceRecordRow.id,
@@ -121,6 +122,9 @@ def _base_query(filters: ReportFilters, department_scope: Optional[int]) -> Sele
 
     # The caller's department scope is applied FIRST and cannot be widened by a filter: an HOD
     # passing ?department_id= for someone else is refused at the route, and this is the backstop.
+    if section_ids is not None:
+        # A teacher reports only on the classes they teach.
+        stmt = stmt.where(ClassSession.section_id.in_(list(section_ids) or [-1]))
     if department_scope is not None:
         stmt = stmt.where(Subject.department_id == department_scope)
     elif filters.department_id is not None:
@@ -147,12 +151,18 @@ def _base_query(filters: ReportFilters, department_scope: Optional[int]) -> Sele
 
 
 def _utc(d: date) -> datetime:
-    return datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+    """Local midnight of a calendar day, as UTC. A "from 3 Oct" filter must start at 00:00 in
+    the college's timezone, not at 00:00 UTC (05:30 IST)."""
+    from app.clock import tz_of
+    from app.runtime import cfg
+
+    zone = _zone(tz_of(cfg))
+    return datetime.combine(d, datetime.min.time()).replace(tzinfo=zone).astimezone(timezone.utc)
 
 
 def count_records(db: Session, filters: ReportFilters,
-                  department_scope: Optional[int]) -> int:
-    inner = _base_query(filters, department_scope).subquery()
+                  department_scope: Optional[int], section_ids=None) -> int:
+    inner = _base_query(filters, department_scope, section_ids).subquery()
     return int(db.scalar(select(func.count()).select_from(inner)) or 0)
 
 
@@ -169,7 +179,8 @@ def _zone(tz: str):
 
 def query_records(db: Session, filters: ReportFilters, department_scope: Optional[int],
                   *, page: int = 1, page_size: int = 50,
-                  limit: Optional[int] = None, tz: str = "UTC") -> List[dict]:
+                  limit: Optional[int] = None, tz: str = "UTC",
+                  section_ids=None) -> List[dict]:
     """One page of the report. `limit` overrides paging for exports.
 
     Timestamps are stored UTC and rendered in the organisation's zone here — a report that
@@ -177,7 +188,7 @@ def query_records(db: Session, filters: ReportFilters, department_scope: Optiona
     too, so a late-evening class does not appear on the wrong day.
     """
     zone = _zone(tz)
-    stmt = _base_query(filters, department_scope).order_by(
+    stmt = _base_query(filters, department_scope, section_ids).order_by(
         ClassSession.scheduled_start.desc(), User.roll_number)
 
     if limit is not None:
@@ -210,14 +221,16 @@ def query_records(db: Session, filters: ReportFilters, department_scope: Optiona
 
 
 def daily_absentees(db: Session, on: date, department_scope: Optional[int],
-                    *, section_id: Optional[int] = None, tz: str = "UTC") -> List[dict]:
+                    *, section_id: Optional[int] = None, tz: str = "UTC",
+                    section_ids=None) -> List[dict]:
     """Everyone marked absent on one day, grouped per student.
 
     The list a front office actually uses: one row per student with the periods they missed,
     not one row per missed period.
     """
     filters = ReportFilters(date_from=on, date_to=on, status="absent", section_id=section_id)
-    rows = query_records(db, filters, department_scope, limit=MAX_EXPORT_ROWS, tz=tz)
+    rows = query_records(db, filters, department_scope, limit=MAX_EXPORT_ROWS, tz=tz,
+                         section_ids=section_ids)
 
     per_student: dict = {}
     for r in rows:

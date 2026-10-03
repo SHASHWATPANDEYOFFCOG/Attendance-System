@@ -72,7 +72,11 @@ def _live_records() -> Select:
     )
 
 
-def _apply_department(stmt: Select, department_id: Optional[int]) -> Select:
+def _apply_department(stmt: Select, department_id: Optional[int],
+                      section_ids: Optional[Iterable[int]] = None) -> Select:
+    """Department scope (HOD), and/or class scope (teacher: only the sections they teach)."""
+    if section_ids is not None:
+        stmt = stmt.where(ClassSession.section_id.in_(list(section_ids) or [-1]))
     if department_id is None:
         return stmt
     return stmt.join(Subject, Subject.id == ClassSession.subject_id) \
@@ -83,7 +87,7 @@ def _apply_department(stmt: Select, department_id: Optional[int]) -> Select:
 
 def defaulters(db: Session, *, threshold: float = 75.0, department_id: Optional[int] = None,
                section_id: Optional[int] = None, since: Optional[date] = None,
-               limit: int = 500) -> List[dict]:
+               limit: int = 500, section_ids: Optional[Iterable[int]] = None) -> List[dict]:
     """Students below `threshold` percent. The single most-used report; one query.
 
     Ordered worst-first, because the point of the report is who to act on.
@@ -106,7 +110,7 @@ def defaulters(db: Session, *, threshold: float = 75.0, department_id: Optional[
         .where(User.deleted_at.is_(None))
         .group_by(AttendanceRecordRow.user_id, User.display_name, User.roll_number)
     )
-    stmt = _apply_department(stmt, department_id)
+    stmt = _apply_department(stmt, department_id, section_ids)
     if section_id is not None:
         stmt = stmt.where(ClassSession.section_id == section_id)
     if since is not None:
@@ -185,7 +189,8 @@ def can_miss(present: int, counted: int, remaining: int, threshold: float = 75.0
 # ------------------------------------------------------------------ daily trend
 
 def attendance_trend(db: Session, *, days: int = 30,
-                     department_id: Optional[int] = None) -> List[dict]:
+                     department_id: Optional[int] = None,
+                     section_ids: Optional[Iterable[int]] = None) -> List[dict]:
     """Daily attendance percentage, one row per date. Grouped in SQL, not in Python."""
     start = utcnow() - timedelta(days=days)
     day = func.date(ClassSession.scheduled_start).label("day")
@@ -199,7 +204,7 @@ def attendance_trend(db: Session, *, days: int = 30,
         .group_by(day)
         .order_by(day)
     )
-    stmt = _apply_department(stmt, department_id)
+    stmt = _apply_department(stmt, department_id, section_ids)
 
     return [
         {"date": d, "counted": int(c or 0), "present": int(p or 0),
@@ -209,7 +214,8 @@ def attendance_trend(db: Session, *, days: int = 30,
 
 
 def trend_by_department(db: Session, *, days: int = 30,
-                        department_ids: Optional[Iterable[int]] = None) -> dict:
+                        department_ids: Optional[Iterable[int]] = None,
+                        section_ids: Optional[Iterable[int]] = None) -> dict:
     """One series per department, aligned on a shared date axis.
 
     Returns {"dates": [...], "series": [{"name","code","points":[pct|None,...]}]} so the chart
@@ -233,6 +239,8 @@ def trend_by_department(db: Session, *, days: int = 30,
     )
     if department_ids is not None:
         stmt = stmt.where(Department.id.in_(list(department_ids)))
+    if section_ids is not None:
+        stmt = stmt.where(ClassSession.section_id.in_(list(section_ids) or [-1]))
 
     per_dept: dict = defaultdict(dict)
     meta: dict = {}
@@ -254,7 +262,8 @@ def trend_by_department(db: Session, *, days: int = 30,
 
 
 def weekday_profile(db: Session, *, days: int = 90,
-                    department_id: Optional[int] = None) -> List[dict]:
+                    department_id: Optional[int] = None,
+                    section_ids: Optional[Iterable[int]] = None) -> List[dict]:
     """Absence rate per weekday. Feeds the heatmap; 0 = Monday."""
     start = utcnow() - timedelta(days=days)
     # SQLite strftime('%w') is 0=Sunday; shift so 0=Monday to match TimetableSlot.day_of_week.
@@ -270,7 +279,7 @@ def weekday_profile(db: Session, *, days: int = 90,
         .where(ClassSession.scheduled_start >= start)
         .group_by("dow")
     )
-    stmt = _apply_department(stmt, department_id)
+    stmt = _apply_department(stmt, department_id, section_ids)
 
     names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     out = []
@@ -484,7 +493,7 @@ def todays_periods(db: Session, actor: User, *, on: Optional[date] = None,
 
 
 def org_summary(db: Session, *, department_id: Optional[int] = None,
-                threshold: float = 75.0) -> dict:
+                threshold: float = 75.0, section_ids: Optional[Iterable[int]] = None) -> dict:
     """Headline numbers for the top of a dashboard."""
     counted = func.sum(_counted())
     present = func.sum(_present())
@@ -494,11 +503,12 @@ def org_summary(db: Session, *, department_id: Optional[int] = None,
         .where(AttendanceRecordRow.deleted_at.is_(None))
         .where(ClassSession.deleted_at.is_(None))
     )
-    stmt = _apply_department(stmt, department_id)
+    stmt = _apply_department(stmt, department_id, section_ids)
     row = db.execute(stmt).first()
     n_counted, n_present = int(row[0] or 0), int(row[1] or 0)
 
-    low = defaulters(db, threshold=threshold, department_id=department_id, limit=10_000)
+    low = defaulters(db, threshold=threshold, department_id=department_id, limit=10_000,
+                     section_ids=section_ids)
     at_risk = [d for d in low if d["attendance_pct"] >= threshold - 1]
     return {
         "records_counted": n_counted,

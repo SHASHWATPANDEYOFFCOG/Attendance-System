@@ -40,7 +40,7 @@ export default async function PrivacyPage() {
   const f = await facts();
   return (
     <PublicShell brandHeading={false} width={760} subtitle="Privacy policy">
-      <article className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-7">
+      <article className="rounded-[var(--radius-lg)] border border-rule glass p-5 shadow-lift sm:p-7">
         <h1 className="display m-0 mb-1 text-[22px]">How {f.org_name} handles your data</h1>
         <p className="mt-0 font-mono text-[12px] text-ash">Attendance portal · applies to students, staff and guardians</p>
 

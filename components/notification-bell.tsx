@@ -129,7 +129,7 @@ export function NotificationBell({ initial, allHref }: { initial: number; allHre
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-[40px] z-50 w-[min(360px,calc(100vw-24px))] rounded-[var(--radius)] border border-rule bg-card shadow-lift"
+          className="absolute right-0 top-[40px] z-50 w-[min(360px,calc(100vw-24px))] rounded-[var(--radius-lg)] border border-rule glass shadow-lift"
         >
           <div className="flex items-center justify-between border-b border-rule px-3 py-2">
             <span className="display text-[13px]">Notifications</span>

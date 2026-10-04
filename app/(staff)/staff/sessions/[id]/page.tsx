@@ -167,7 +167,7 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
       <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         {([["Present", c.present, "var(--status-present)"], ["Late", c.late, "var(--status-late)"], ["Absent", c.absent, "var(--status-absent)"],
           ["On leave", c.on_leave, "var(--status-leave)"], ["Unmarked", c.unmarked, "var(--ash)"], ["Class", c.roster, "var(--ink)"]] as const).map(([k, v, col]) => (
-          <div key={k} className="rounded-[var(--radius)] border border-rule bg-card py-2 text-center shadow-card">
+          <div key={k} className="rounded-[var(--radius-lg)] border border-rule glass py-2 text-center shadow-card">
             <div className="label text-[10.5px]">{k}</div>
             <div className="font-mono text-[24px] font-semibold tnum" style={{ color: col }}>{v}</div>
           </div>

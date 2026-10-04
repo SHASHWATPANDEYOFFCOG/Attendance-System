@@ -112,18 +112,18 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">From</span>
             <input type="date" name="date_from" defaultValue={sp.date_from ?? ""}
-                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
+                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]" />
           </label>
           <label className="block">
             <span className="label block">To</span>
             <input type="date" name="date_to" defaultValue={sp.date_to ?? ""}
-                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
+                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]" />
           </label>
 
           <label className="block">
             <span className="label block">Department</span>
             <select name="department_id" defaultValue={sp.department_id ?? ""}
-                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]">
               <option value="">All</option>
               {options?.departments.map((d) => (
                 <option key={d.id} value={d.id}>{d.label}</option>
@@ -134,7 +134,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Subject</span>
             <select name="subject_id" defaultValue={sp.subject_id ?? ""}
-                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]">
               <option value="">All</option>
               {options?.subjects.map((s) => (
                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -145,7 +145,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Section</span>
             <select name="section_id" defaultValue={sp.section_id ?? ""}
-                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]">
               <option value="">All</option>
               {options?.sections.map((s) => (
                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -156,7 +156,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Status</span>
             <select name="status" defaultValue={sp.status ?? ""}
-                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]">
               <option value="">Any</option>
               {options?.statuses.map((s) => (
                 <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
@@ -167,7 +167,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Student</span>
             <input name="search" defaultValue={sp.search ?? ""} placeholder="name or roll"
-                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
+                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]" />
           </label>
 
           <div className="flex items-end gap-2">

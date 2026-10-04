@@ -165,7 +165,7 @@ export function ApprovalManagement({ onChange }: { onChange: () => void }) {
       </Card>
 
       {selected.size ? (
-        <div className="sticky top-[60px] z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-rule bg-card p-2.5 shadow-lift">
+        <div className="sticky top-[60px] z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-rule glass p-2.5 shadow-lift">
           <span className="text-[13px]"><strong>{selected.size}</strong> selected</span>
           {ACTIONS_FOR[status].map((a) => (
             <Button key={a} variant={a === "approve" || a === "restore" ? "primary" : "secondary"} busy={busy}

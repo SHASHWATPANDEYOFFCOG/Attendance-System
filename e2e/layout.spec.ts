@@ -79,14 +79,21 @@ test("the command palette opens with Ctrl+K, filters, and navigates by keyboard"
   await signIn(page, ADMIN.username, ADMIN.password, "authority");
   await page.goto("/dashboard");
   await page.waitForLoadState("networkidle");
-  await page.keyboard.press("Control+k");
   const box = page.getByRole("combobox", { name: "Search pages and actions" });
-  await expect(box).toBeFocused();
+  // The shortcut listener attaches on hydration; retry the key until it has.
+  await expect(async () => {
+    await page.keyboard.press("Control+k");
+    await expect(box).toBeFocused({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
   await box.fill("work");
   await expect(page.getByRole("option").first()).toContainText("Workspaces");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/staff\/workspaces/);
-  await page.keyboard.press("Control+k");
+  await page.waitForLoadState("networkidle");
+  await expect(async () => {
+    await page.keyboard.press("Control+k");
+    await expect(box).toBeFocused({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
 });

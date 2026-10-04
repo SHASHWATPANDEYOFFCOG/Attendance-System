@@ -139,7 +139,7 @@ function ConfirmDialog({ pending, close }: { pending: Pending; close: () => void
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={pending.reason.placeholder}
-              className="min-h-[90px] w-full rounded-[var(--radius)] border border-rule bg-card px-3.5 py-2.5 text-[14.5px] text-ink focus:border-accent"
+              className="min-h-[90px] w-full rounded-[var(--radius)] border border-rule bg-card px-3.5 py-2.5 text-[14.5px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)] focus:border-accent"
             />
             {tooShort && reason ? (
               <p className="mt-1 text-[12.5px] text-oxide">Write at least {min} characters.</p>

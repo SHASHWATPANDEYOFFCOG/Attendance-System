@@ -123,7 +123,7 @@ function History() {
         {data.totals ? (
           <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Totals for the lectures shown">
             {SUMMARY.filter(([k]) => k === "present" || k === "late" || k === "absent" || (data.totals?.[k] ?? 0) > 0).map(([k, label, col]) => (
-              <div key={k} className="rounded-[var(--radius)] border border-rule bg-card py-2 text-center shadow-card">
+              <div key={k} className="rounded-[var(--radius-lg)] border border-rule glass py-2 text-center shadow-card">
                 <div className="label text-[10.5px]">{label}</div>
                 <div className="font-mono text-[22px] font-semibold tnum" style={{ color: col }}>{data.totals?.[k] ?? 0}</div>
               </div>

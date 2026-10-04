@@ -217,7 +217,7 @@ export default async function DashboardPage() {
 
       {/* Server housekeeping is for whoever runs the system, not for every teacher. */}
       {isAdmin && warnings.length ? (
-        <details className="mb-4 rounded-[var(--radius)] border border-rule bg-card shadow-card">
+        <details className="mb-4 rounded-[var(--radius-lg)] border border-rule glass shadow-card">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
             <span className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: warnings.some((w) => /ANTI-SPOOF|EMAIL FAILING/i.test(w)) ? "var(--oxide)" : "var(--amber)" }} aria-hidden />

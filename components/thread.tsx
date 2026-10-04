@@ -107,7 +107,7 @@ export function Composer({
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(e as unknown as React.FormEvent);
         }}
         placeholder={placeholder}
-        className="min-h-[80px] w-full rounded-[var(--radius)] border border-rule bg-card px-3 py-2 text-[14px] text-ink"
+        className="min-h-[80px] w-full rounded-[var(--radius)] border border-rule bg-card px-3 py-2 text-[14px] text-ink transition-[border-color,box-shadow] duration-200 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]"
       />
       {error ? <p role="alert" className="m-0 text-[12.5px] text-oxide">{error}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-2">

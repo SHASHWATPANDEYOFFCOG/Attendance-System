@@ -47,7 +47,7 @@ export default async function GuidePage() {
           ))}
         </nav>
 
-        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="administrator">
+        <section className="rounded-[var(--radius-lg)] border border-rule glass p-5 shadow-lift sm:p-6" aria-labelledby="administrator">
           <h2 id="administrator" className="display m-0 mb-1 text-[20px]">Administrator guide</h2>
           <p className="mb-3 mt-0 text-[13.5px] text-ash">Administrators control the whole system. You need an authority account and the administrator code.</p>
           <ol className="m-0 grid list-none gap-3.5 p-0">
@@ -83,7 +83,7 @@ export default async function GuidePage() {
           </ol>
         </section>
 
-        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="authority">
+        <section className="rounded-[var(--radius-lg)] border border-rule glass p-5 shadow-lift sm:p-6" aria-labelledby="authority">
           <h2 id="authority" className="display m-0 mb-1 text-[20px]">Authority guide (teachers and HODs)</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Get an account">
@@ -108,7 +108,7 @@ export default async function GuidePage() {
           </ol>
         </section>
 
-        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="tablet">
+        <section className="rounded-[var(--radius-lg)] border border-rule glass p-5 shadow-lift sm:p-6" aria-labelledby="tablet">
           <h2 id="tablet" className="display m-0 mb-1 text-[20px]">Tablet guide</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Open the website on the tablet">Use its browser (Chrome or Safari). Add it to the home screen for an app-like icon.</Step>
@@ -124,7 +124,7 @@ export default async function GuidePage() {
           </ol>
         </section>
 
-        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="students">
+        <section className="rounded-[var(--radius-lg)] border border-rule glass p-5 shadow-lift sm:p-6" aria-labelledby="students">
           <h2 id="students" className="display m-0 mb-3 text-[20px]">Student guide</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Register">
@@ -162,7 +162,7 @@ export default async function GuidePage() {
           </div>
         </section>
 
-        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="teachers">
+        <section className="rounded-[var(--radius-lg)] border border-rule glass p-5 shadow-lift sm:p-6" aria-labelledby="teachers">
           <h2 id="teachers" className="display m-0 mb-3 text-[20px]">Taking attendance (teachers)</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Your classes">

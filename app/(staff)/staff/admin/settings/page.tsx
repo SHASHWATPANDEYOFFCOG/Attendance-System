@@ -437,7 +437,7 @@ function CollegeTab({ canEdit }: { canEdit: boolean }) {
             </Card>
           );
         })}
-        <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-rule bg-card p-3 shadow-lift">
+        <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] border border-rule glass p-3 shadow-lift">
           <Button type="submit" variant="primary" busy={busy} disabled={!Object.keys(dirty).length}>Save changes</Button>
           {Object.keys(dirty).length ? <Button onClick={() => load()}>Discard</Button> : null}
           <span className="text-[13px] text-ash">{Object.keys(dirty).length ? `${Object.keys(dirty).length} unsaved change(s)` : "All changes saved"}</span>

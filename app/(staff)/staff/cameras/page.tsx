@@ -119,7 +119,7 @@ export default function CamerasPage() {
                   actions={isAdministrator && !editing ? <Button variant="primary" onClick={() => setEditing("new")}>+ Add camera</Button> : null} />
 
       {isAdministrator ? (
-        <details className="mb-4 rounded-[var(--radius)] border border-rule bg-card shadow-card" open={rows?.length === 0}>
+        <details className="mb-4 rounded-[var(--radius-lg)] border border-rule glass shadow-card" open={rows?.length === 0}>
           <summary className="cursor-pointer px-4 py-3"><span className="label text-[12px]">How to add a camera</span></summary>
           <ol className="m-0 grid list-decimal gap-1.5 border-t border-rule py-3 pl-9 pr-4 text-[13.5px]">
             <li>Create a <Link href="/staff/workspaces" className="text-ink underline">workspace</Link> (e.g. &quot;CSE Block&quot;) and add the authorities who should use its cameras.</li>

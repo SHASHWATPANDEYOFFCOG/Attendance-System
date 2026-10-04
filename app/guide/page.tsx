@@ -4,6 +4,22 @@ import Link from "next/link";
 import { PublicShell } from "@/components/public-shell";
 
 export const metadata = { title: "User guide" };
+export const dynamic = "force-dynamic";
+
+const API_BASE = process.env.ATTENDANCE_API_BASE ?? "http://127.0.0.1:8079";
+const DEFAULT_POLICY = { present_window_min: 10, late_window_min: 20, min_attendance_pct: 75 };
+
+/** The college's own windows and minimum, so the guide never contradicts the settings. */
+async function policy() {
+  try {
+    const r = await fetch(`${API_BASE}/api/public/academic-options`, { cache: "no-store" });
+    if (!r.ok) throw new Error();
+    const body = (await r.json()) as { policy?: Partial<typeof DEFAULT_POLICY> };
+    return { ...DEFAULT_POLICY, ...body.policy };
+  } catch {
+    return DEFAULT_POLICY;
+  }
+}
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
@@ -18,7 +34,8 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-export default function GuidePage() {
+export default async function GuidePage() {
+  const p = await policy();
   return (
     <PublicShell width={820} subtitle="User guide">
       <div className="grid gap-4">
@@ -40,15 +57,15 @@ export default function GuidePage() {
             <Step n={4} title="Mark attendance in class">
               When a lecture is live, <em>Mark attendance</em> appears on your dashboard. Use <strong>Face check</strong> (a short
               selfie with head turns) or <strong>Classroom code</strong> (scan the QR on the screen or type its 6 digits). Your
-              location is checked once. Within 10 minutes of the start you are Present, until 20 minutes Late, after that the
-              window closes. Classroom cameras may also mark you automatically.
+              location is checked once. Within {p.present_window_min} minutes of the start you are Present, until{" "}
+              {p.late_window_min} minutes Late, after that the window closes. Classroom cameras may also mark you automatically.
             </Step>
             <Step n={5} title="Leave, issues and messages">
               Apply for leave (with a certificate if you have one) under <em>Leave</em> — approved leave becomes “On leave” and
               does not count against you. Raise attendance corrections or other problems under <em>Issues</em>. Messages and
               notices from teachers appear under <em>Messages</em>, and the bell shows new notifications instantly.
             </Step>
-            <Step n={6} title="Keep above the minimum">
+            <Step n={6} title={`Keep above ${p.min_attendance_pct}%`}>
               Your dashboard shows your percentage per subject, a calendar, and — if you are below the minimum — exactly how many
               classes in a row you need. Download your history as a PDF from <em>History</em>.
             </Step>

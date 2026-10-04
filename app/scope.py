@@ -5,7 +5,10 @@ The single source of truth for the teacher/HOD/admin boundary on *student* data,
 
     super admin   every student
     HOD (admin)   students of their own department (branch)
-    teacher       students in sections they teach (a FacultyAssignment or a TimetableSlot)
+    teacher       students in sections they teach (a FacultyAssignment or a TimetableSlot),
+                  plus *registrations waiting for a decision* (pending / rejected) in their own
+                  branch — so any teacher of the branch can verify a new student, even before
+                  being assigned classes. Approved students stay limited to the teacher's classes.
     student       themselves only
     parent        their linked children, read-only
 
@@ -17,7 +20,7 @@ from __future__ import annotations
 from typing import Optional, Set
 
 from fastapi import HTTPException, status
-from sqlalchemy import false, or_, select, true
+from sqlalchemy import and_, false, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.auth import is_admin, is_faculty, is_parent, is_staff, is_super_admin, role_of
@@ -30,6 +33,10 @@ from app.models import (
     TimetableSlot,
     User,
 )
+
+
+#: Registrations still waiting for a teacher's decision.
+UNDECIDED = ("pending", "rejected")
 
 
 def taught_section_ids(db: Session, actor: User) -> Set[int]:
@@ -71,7 +78,11 @@ def student_scope_clause(db: Session, actor: User):
                    StudentProfile.section_id.in_(secs or {-1}))
     if is_faculty(actor):
         secs = taught_section_ids(db, actor)
-        return StudentProfile.section_id.in_(secs or {-1})
+        taught = StudentProfile.section_id.in_(secs or {-1})
+        if not actor.department_id:
+            return taught
+        return or_(taught, and_(StudentProfile.status.in_(UNDECIDED),
+                                StudentProfile.department_id == actor.department_id))
     return StudentProfile.user_id == actor.id
 
 
@@ -89,6 +100,8 @@ def can_manage_student(db: Session, actor: User, student_id: int) -> bool:
         if prof.department_id == actor.department_id:
             return True
         return prof.section_id in department_section_ids(db, actor.department_id)
+    if prof.status in UNDECIDED and actor.department_id and prof.department_id == actor.department_id:
+        return True                         # a registration in my branch, waiting for a decision
     return prof.section_id is not None and prof.section_id in taught_section_ids(db, actor)
 
 
@@ -165,6 +178,18 @@ def department_heads(db: Session, department_id: Optional[int]) -> Set[int]:
     return hods
 
 
+def registration_verifiers(db: Session, prof: StudentProfile) -> Set[int]:
+    """Who is told about a new (or resubmitted) registration: the section's teachers, every
+    active teacher of the branch, and its HOD (super admins when the branch has none)."""
+    dept = prof.department_id or section_department_id(db, prof.section_id)
+    staff = section_teachers(db, prof.section_id) | department_heads(db, dept)
+    if dept is not None:
+        staff |= set(db.scalars(select(User.id).where(
+            User.role == "faculty", User.department_id == dept,
+            User.is_active.is_(True), User.deleted_at.is_(None))))
+    return staff
+
+
 def responsible_staff(db: Session, prof: StudentProfile) -> Set[int]:
     """Teachers of the student's section; if none are assigned yet, the branch HOD/admins."""
     staff = section_teachers(db, prof.section_id)
@@ -176,7 +201,8 @@ def responsible_staff(db: Session, prof: StudentProfile) -> Set[int]:
 
 __all__ = [
     "assert_can_manage_section", "assert_can_manage_student", "can_manage_student",
-    "can_read_student", "department_heads", "manageable_section_ids", "responsible_staff",
+    "can_read_student", "department_heads", "manageable_section_ids", "registration_verifiers",
+    "responsible_staff",
     "role_of", "section_department_id", "section_teachers", "student_scope_clause",
     "subject_in_scope", "taught_section_ids",
 ]

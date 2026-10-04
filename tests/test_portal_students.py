@@ -250,11 +250,10 @@ def test_signup_verify_pending_then_teacher_approves(api, campus):
     # The class teacher was told, and sees the registration.
     listing = api.get("/api/students?status=pending", headers=campus["teacher_a"]).json()
     assert [row["id"] for row in listing["rows"]] == [sid]
-    # A teacher of another section neither sees nor can approve it.
-    assert api.get("/api/students?status=pending",
-                   headers=campus["teacher_b"]).json()["rows"] == []
-    assert api.post(f"/api/students/{sid}/approve",
-                    headers=campus["teacher_b"]).status_code == 403
+    # Any teacher of the same branch may verify a registration (another branch may not: see
+    # test_any_teacher_of_the_branch_is_told_about_and_can_verify_a_new_registration).
+    assert [row["id"] for row in api.get("/api/students?status=pending",
+                                         headers=campus["teacher_b"]).json()["rows"]] == [sid]
 
     assert api.post(f"/api/students/{sid}/approve",
                     headers=campus["teacher_a"]).status_code == 200
@@ -503,3 +502,28 @@ def test_settings_validation_and_audit(api, campus):
     log = api.get("/api/admin/audit?action=settings_changed", headers=campus["admin"]).json()
     assert log["meta"]["total"] == 1
     assert "min_attendance_pct" in log["rows"][0]["detail"]
+
+
+def test_any_teacher_of_the_branch_is_told_about_and_can_verify_a_new_registration(api, campus, make_user):
+    """A teacher with no classes assigned yet still sees and decides registrations of their
+    branch; once approved, the student belongs to their class teachers only."""
+    new_t, new_h = make_user("new.teacher", role="faculty", department_id=campus["cse"])
+    _ece_t, ece_h = make_user("ece.teacher", role="faculty", department_id=campus["ece"])
+    assert _signup(api, campus).status_code == 201
+    assert _verify(api, "asha@college.edu").status_code == 200
+
+    titles = [n["title"] for n in api.get("/api/notifications", headers=new_h).json()["rows"]]
+    assert "New student registration" in titles
+    assert api.get("/api/approvals/summary", headers=new_h).json()["registrations"] == 1
+    pending = api.get("/api/students?status=pending", headers=new_h).json()["rows"]
+    assert [p["email"] for p in pending] == ["asha@college.edu"]
+    sid = pending[0]["id"]
+
+    # Another branch's teacher neither sees nor decides it.
+    assert api.get("/api/students?status=pending", headers=ece_h).json()["rows"] == []
+    assert api.post(f"/api/students/{sid}/approve", headers=ece_h).status_code == 403
+
+    assert api.post(f"/api/students/{sid}/approve", headers=new_h).status_code == 200
+    # Approved and in section A, which this teacher does not teach: back to the normal boundary.
+    assert api.get(f"/api/students/{sid}", headers=new_h).status_code == 403
+    assert api.get(f"/api/students/{sid}", headers=campus["teacher_a"]).status_code == 200

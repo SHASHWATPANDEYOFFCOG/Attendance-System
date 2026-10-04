@@ -42,7 +42,7 @@ from app.notify import notify
 from app.ratelimit import enforce
 from app.routes.academic import section_label
 from app.runtime import public_base_url
-from app.scope import responsible_staff
+from app.scope import registration_verifiers, responsible_staff
 from app.uploads import IMAGES, MB, delete_file, save_upload
 
 router = APIRouter(prefix="/api", tags=["accounts"])
@@ -169,7 +169,7 @@ def confirm_email(db: Session, user: User) -> Optional[str]:
     staff_message = on_email_verified(db, user)
     prof = _profile(db, user.id)
     if prof is not None and prof.status == StudentStatus.PENDING.value:
-        notify(db, responsible_staff(db, prof), "registration_pending",
+        notify(db, registration_verifiers(db, prof), "registration_pending",
                "New student registration",
                f"{user.display_name} ({prof.roll_number}) registered for "
                f"{section_label(prof.section) if prof.section else 'your class'} and is waiting "
@@ -584,7 +584,7 @@ def resubmit(request: Request, db: Session = Depends(get_db), actor: User = Depe
         raise HTTPException(409, "Only a rejected registration can be resubmitted.")
     prof.status = StudentStatus.PENDING.value
     prof.rejection_reason = None
-    notify(db, responsible_staff(db, prof), "registration_pending", "Registration resubmitted",
+    notify(db, registration_verifiers(db, prof), "registration_pending", "Registration resubmitted",
            f"{actor.display_name} ({prof.roll_number}) updated their details and resubmitted "
            f"their registration.", link="/staff/approvals", email=True)
     audit(db, actor, "registration_resubmitted", target_type="user", target_id=actor.id,

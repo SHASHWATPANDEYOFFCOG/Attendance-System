@@ -1,32 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/pwa";
 import { UiProvider } from "@/components/toast";
 
-/* A deliberate pairing, not Inter for everything:
-     Barlow Condensed — condensed grotesque; uppercase letterspaced labels and headings
-     IBM Plex Sans    — body copy
-     IBM Plex Mono    — ALL data, tabular figures, so columns of numbers line up */
-const label = Barlow_Condensed({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-label-loaded",
-  display: "swap",
-});
-const sans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-sans-loaded",
-  display: "swap",
-});
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-mono-loaded",
-  display: "swap",
-});
+/* Geist for everything readable (tight tracking at display sizes, see .headline / .display),
+   Geist Mono for data and figures so columns of numbers line up. Variable fonts: one file
+   each, every weight. */
+const sans = Geist({ subsets: ["latin"], variable: "--font-sans-loaded", display: "swap" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono-loaded", display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Attendance Register", template: "%s · Attendance Register" },
@@ -56,6 +39,7 @@ export const viewport: Viewport = {
  */
 const THEME_BOOTSTRAP = `
 (function () {
+  document.documentElement.classList.add('js');
   try {
     var t = localStorage.getItem('att_theme');
     if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
@@ -67,7 +51,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html
       lang="en"
-      className={`${label.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

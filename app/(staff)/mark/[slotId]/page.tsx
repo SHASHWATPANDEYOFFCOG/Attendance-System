@@ -60,7 +60,7 @@ export default async function MarkSession({
 
   return (
     <main className="relative z-[1] mx-auto max-w-[900px] px-4 pb-16 pt-6 md:px-5">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-3">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] pb-3">
         <div>
           <h1 className="display m-0 text-[26px]">
             {data?.session.subject_code ?? "Register"}
@@ -73,7 +73,7 @@ export default async function MarkSession({
         </div>
         <Link
           href="/mark"
-          className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint"
+          className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint"
         >
           All periods
         </Link>
@@ -83,7 +83,7 @@ export default async function MarkSession({
         {error ? (
           <div
             role="alert"
-            className="rounded-r-[2px] border-l-4 px-3.5 py-2.5 text-[13.5px]"
+            className="rounded-[var(--radius-sm)] border-l-4 px-3.5 py-2.5 text-[13.5px]"
             style={{
               borderLeftColor: "var(--oxide)",
               background: "color-mix(in srgb, var(--oxide) 11%, transparent)",

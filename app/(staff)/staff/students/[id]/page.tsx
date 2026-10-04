@@ -95,7 +95,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
       <div className="mb-4 grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         <Card>
           <div className="mb-3 flex items-center gap-3">
-            <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-[3px] border border-rule bg-paper">
+            <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-[var(--radius)] border border-rule bg-paper">
               {s.photo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={`/api/backend${s.photo_url}`} alt={`${d.full_name}'s photo`} className="h-full w-full object-cover" />

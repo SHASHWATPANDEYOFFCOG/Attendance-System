@@ -17,10 +17,14 @@ import type {
 import { clsx } from "clsx";
 
 export const inputClass =
-  "w-full rounded-[3px] border bg-card px-3 py-2.5 text-[14px] text-ink placeholder:text-ash/70 disabled:opacity-60";
+  "w-full rounded-[var(--radius)] border bg-card px-3.5 py-2.5 text-[14.5px] text-ink placeholder:text-muted " +
+  "transition-[border-color,box-shadow] duration-200 disabled:cursor-not-allowed disabled:opacity-60 " +
+  "focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)]";
 
 function fieldBorder(error?: string | null) {
-  return error ? "border-oxide" : "border-rule focus:border-ink";
+  return error
+    ? "border-oxide focus:border-oxide"
+    : "border-rule hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--rule))] focus:border-accent";
 }
 
 type FieldShell = { label: string; error?: string | null; hint?: ReactNode; required?: boolean };
@@ -140,32 +144,45 @@ export function Checkbox({
   );
 }
 
-type Variant = "primary" | "secondary" | "danger" | "ghost";
+type Variant = "primary" | "secondary" | "outline" | "danger" | "ghost" | "glass";
 
+/**
+ * Buttons. primary = the gradient action (one per area); secondary/outline = bordered;
+ * ghost = text only; glass = on imagery; danger = destructive. `arrow` adds a forward
+ * arrow that nudges on hover. Loading shows a spinner and blocks repeat clicks.
+ */
 export function Button({
   variant = "secondary",
   busy = false,
+  arrow = false,
   className,
   children,
   disabled,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; busy?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; busy?: boolean; arrow?: boolean }) {
   const style =
     variant === "primary"
-      ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }
+      ? { backgroundImage: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }
       : variant === "danger"
-        ? { background: "var(--oxide)", borderColor: "var(--oxide)", color: "var(--card)" }
+        ? { background: "var(--oxide)", borderColor: "var(--oxide)", color: "#fff" }
         : variant === "ghost"
           ? { background: "transparent", borderColor: "transparent", color: "var(--ink)" }
-          : { background: "transparent", borderColor: "var(--ink)", color: "var(--ink)" };
+          : variant === "glass"
+            ? { background: "var(--glass)", borderColor: "var(--rule)", color: "var(--ink)" }
+            : { background: "var(--card)", borderColor: "var(--rule)", color: "var(--ink)" };
   return (
     <button
       type="button"
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       className={clsx(
-        "display inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-[3px] border px-3.5 py-2 text-[12px] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
+        "btn display inline-flex min-h-[38px] cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius)] border px-4 py-2 text-[13.5px]",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        variant === "primary" && "btn-primary",
+        (variant === "secondary" || variant === "outline") && "hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--rule))] hover:bg-tint",
         variant === "ghost" && "hover:bg-tint",
+        variant === "glass" && "glass hover:bg-tint",
+        variant === "danger" && "hover:opacity-90",
         className,
       )}
       style={style}
@@ -173,6 +190,7 @@ export function Button({
     >
       {busy ? <Spinner /> : null}
       {children}
+      {arrow && !busy ? <span aria-hidden className="btn-arrow">→</span> : null}
     </button>
   );
 }
@@ -201,10 +219,11 @@ export function FormError({ children }: { children?: ReactNode }) {
   return (
     <div
       role="alert"
-      className="mb-3 rounded-r-[2px] border-l-4 px-3 py-2 text-[13.5px]"
+      className="mb-3 rounded-[var(--radius)] border px-3.5 py-2.5 text-[13.5px]"
       style={{
-        borderLeftColor: "var(--oxide)",
-        background: "color-mix(in srgb, var(--oxide) 11%, transparent)",
+        borderColor: "color-mix(in srgb, var(--oxide) 35%, transparent)",
+        background: "color-mix(in srgb, var(--oxide) 10%, var(--card))",
+        boxShadow: "inset 3px 0 0 var(--oxide)",
       }}
     >
       {children}

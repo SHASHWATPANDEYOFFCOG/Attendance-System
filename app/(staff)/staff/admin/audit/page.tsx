@@ -70,7 +70,7 @@ export default function AuditPage() {
               <thead>
                 <tr>
                   {["When", "Who", "Action", "Target", "Reason / detail"].map((h) => (
-                    <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
+                    <th key={h} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">{h}</th>
                   ))}
                 </tr>
               </thead>

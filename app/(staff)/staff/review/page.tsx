@@ -58,7 +58,7 @@ function Review() {
   return (
     <Page wide>
       <PageHeader title="Review queue" subtitle="Camera sightings that need your decision"
-                  actions={session ? <Link href={`/staff/sessions/${session}`} className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline">Back to session</Link> : null} />
+                  actions={session ? <Link href={`/staff/sessions/${session}`} className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink no-underline">Back to session</Link> : null} />
       {error ? <PageError message={error} retry={load} /> : !rows ? <PageLoading /> : !rows.length ? (
         <EmptyState title="Nothing to review" />
       ) : (
@@ -69,14 +69,14 @@ function Review() {
                 <figure className="m-0 text-center">
                   {it.snapshot ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={it.snapshot} alt="Camera face crop" className="h-[104px] w-[104px] rounded-[3px] border border-rule object-cover" />
-                  ) : <div className="grid h-[104px] w-[104px] place-items-center rounded-[3px] border border-dashed border-rule text-[11px] text-ash">no crop</div>}
+                    <img src={it.snapshot} alt="Camera face crop" className="h-[104px] w-[104px] rounded-[var(--radius)] border border-rule object-cover" />
+                  ) : <div className="grid h-[104px] w-[104px] place-items-center rounded-[var(--radius)] border border-dashed border-rule text-[11px] text-ash">no crop</div>}
                   <figcaption className="label text-[10px]">camera</figcaption>
                 </figure>
                 {it.photo_url ? (
                   <figure className="m-0 text-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/api/backend${it.photo_url}`} alt="Profile photo" className="h-[104px] w-[104px] rounded-[3px] border border-rule object-cover" />
+                    <img src={`/api/backend${it.photo_url}`} alt="Profile photo" className="h-[104px] w-[104px] rounded-[var(--radius)] border border-rule object-cover" />
                     <figcaption className="label text-[10px]">profile</figcaption>
                   </figure>
                 ) : null}

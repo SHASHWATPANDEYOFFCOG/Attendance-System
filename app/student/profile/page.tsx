@@ -363,7 +363,7 @@ function PhotoCard({ profile, onSaved }: { profile: Profile; onSaved: () => void
     <Card>
       <CardHeader title="Profile photo" />
       <div className="flex items-center gap-4">
-        <div className="grid h-[96px] w-[96px] shrink-0 place-items-center overflow-hidden rounded-[3px] border border-rule bg-paper">
+        <div className="grid h-[96px] w-[96px] shrink-0 place-items-center overflow-hidden rounded-[var(--radius)] border border-rule bg-paper">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`/api/backend${url}`} alt="Your profile photo" className="h-full w-full object-cover" />
@@ -371,7 +371,7 @@ function PhotoCard({ profile, onSaved }: { profile: Profile; onSaved: () => void
             <span className="label">None</span>
           )}
         </div>
-        <label className="display inline-flex cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint">
+        <label className="display inline-flex cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint">
           {busy ? "Uploading…" : "Change photo"}
           <input
             type="file"

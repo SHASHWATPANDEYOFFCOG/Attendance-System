@@ -15,7 +15,7 @@ export default async function MarkIndex() {
 
   return (
     <main className="relative z-[1] mx-auto max-w-[900px] px-4 pb-16 pt-6 md:px-5">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-3">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] pb-3">
         <div>
           <h1 className="display m-0 text-[26px]">Mark attendance</h1>
           <p className="mt-0.5 font-mono text-xs text-ash">
@@ -24,7 +24,7 @@ export default async function MarkIndex() {
         </div>
         <Link
           href="/dashboard"
-          className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint"
+          className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint"
         >
           Dashboard
         </Link>
@@ -58,7 +58,7 @@ export default async function MarkIndex() {
                   )}
                   <Link
                     href={`/mark/${p.slot_id}`}
-                    className="display rounded-[3px] border px-3 py-1.5 text-[11px]"
+                    className="display rounded-[var(--radius)] border px-3 py-1.5 text-[12px]"
                     style={
                       p.marked
                         ? { borderColor: "var(--rule)", color: "var(--ash)" }

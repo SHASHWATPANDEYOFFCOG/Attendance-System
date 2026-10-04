@@ -91,13 +91,13 @@ export function FaceReview({ onChange }: { onChange: () => void }) {
             {e.photo_url ? (
               <figure className="m-0 text-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/backend${e.photo_url}`} alt="Profile photo" className="h-[96px] w-[96px] rounded-[3px] border-2 object-cover" style={{ borderColor: "var(--ink)" }} />
+                <img src={`/api/backend${e.photo_url}`} alt="Profile photo" className="h-[96px] w-[96px] rounded-[var(--radius)] border-2 object-cover" style={{ borderColor: "var(--ink)" }} />
                 <figcaption className="label text-[10px]">profile</figcaption>
               </figure>
             ) : null}
             {samples[e.id] ? samples[e.id].map((src, i) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={src} alt={`Enrollment photo ${i + 1}`} className="h-[96px] w-[96px] rounded-[3px] border border-rule object-cover" />
+              <img key={i} src={src} alt={`Enrollment photo ${i + 1}`} className="h-[96px] w-[96px] rounded-[var(--radius)] border border-rule object-cover" />
             )) : <Button onClick={() => show(e.id)}>Show enrollment photos</Button>}
           </div>
         </Card>

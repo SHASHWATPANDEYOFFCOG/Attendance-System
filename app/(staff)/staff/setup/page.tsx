@@ -22,10 +22,10 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
               <Link
                 href={`/staff/setup?tab=${key}`}
                 aria-current={tab === key ? "page" : undefined}
-                className="display block rounded-[3px] border px-3 py-1.5 text-[11.5px] no-underline"
+                className="display block rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px] no-underline"
                 style={
                   tab === key
-                    ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }
+                    ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }
                     : { borderColor: "var(--rule)", color: "var(--ink)" }
                 }
               >

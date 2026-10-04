@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { LogOut, Moon, SunMedium } from "lucide-react";
+
 export function LogoutButton({ to = "/login" }: { to?: string }) {
   const router = useRouter();
   return (
@@ -14,9 +16,11 @@ export function LogoutButton({ to = "/login" }: { to?: string }) {
         router.push(to);
         router.refresh();
       }}
-      className="display cursor-pointer rounded-[3px] border border-ink bg-transparent px-3.5 py-2 text-[12px] text-ink hover:bg-tint"
+      className="btn display inline-flex h-[38px] cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-rule bg-transparent px-3 text-[13px] text-ink hover:bg-tint"
+      aria-label="Sign out"
     >
-      Sign out
+      <LogOut size={16} strokeWidth={1.8} aria-hidden />
+      <span className="hidden sm:inline">Sign out</span>
     </button>
   );
 }
@@ -53,18 +57,11 @@ export function ThemeToggle() {
         }
         setDark(!dark);
       }}
-      className="inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[3px] border border-rule bg-transparent text-ash hover:border-ash hover:text-ink"
+      className="btn inline-flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-[var(--radius)] border border-rule bg-transparent text-ash hover:bg-tint hover:text-ink"
     >
-      {dark ? (
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-        </svg>
-      )}
+      <span className="inline-flex transition-transform duration-300" style={{ transform: dark ? "rotate(0deg)" : "rotate(-90deg)" }}>
+        {dark ? <SunMedium size={17} strokeWidth={1.8} aria-hidden /> : <Moon size={17} strokeWidth={1.8} aria-hidden />}
+      </span>
     </button>
   );
 }

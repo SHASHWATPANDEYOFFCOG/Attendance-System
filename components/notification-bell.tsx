@@ -109,7 +109,7 @@ export function NotificationBell({ initial, allHref }: { initial: number; allHre
         aria-label={count ? `Notifications, ${count} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="true"
-        className="relative inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[3px] border border-rule bg-transparent text-ash hover:border-ash hover:text-ink"
+        className="relative inline-flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[var(--radius)] border border-rule bg-transparent text-ash hover:border-ash hover:text-ink"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -129,7 +129,7 @@ export function NotificationBell({ initial, allHref }: { initial: number; allHre
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-[40px] z-50 w-[min(360px,calc(100vw-24px))] rounded-[3px] border border-rule bg-card shadow-lift"
+          className="absolute right-0 top-[40px] z-50 w-[min(360px,calc(100vw-24px))] rounded-[var(--radius)] border border-rule bg-card shadow-lift"
         >
           <div className="flex items-center justify-between border-b border-rule px-3 py-2">
             <span className="display text-[13px]">Notifications</span>

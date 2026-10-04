@@ -97,7 +97,7 @@ function NewNotice({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
             <Checkbox label="Also send by email" checked={email} onChange={(e) => setEmail(e.target.checked)} />
           </div>
         </div>
-        <label className="display inline-flex w-fit cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint">
+        <label className="display inline-flex w-fit cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint">
           {file ? `Attached: ${file.name}` : "Attach PDF / image (optional)"}
           <input type="file" accept="application/pdf,image/jpeg,image/png" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>

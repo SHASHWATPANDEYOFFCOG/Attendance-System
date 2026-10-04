@@ -18,9 +18,9 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
           {error.digest ? <> (reference <span className="font-mono">{error.digest}</span>)</> : null}.
         </p>
         <div className="mt-3 flex justify-center gap-2">
-          <button type="button" onClick={reset} className="display cursor-pointer rounded-[3px] border px-4 py-2 text-[12px]"
-                  style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>Try again</button>
-          <Link href="/" className="display rounded-[3px] border border-ink px-4 py-2 text-[12px] text-ink no-underline">Home</Link>
+          <button type="button" onClick={reset} className="display cursor-pointer rounded-[var(--radius)] border px-4 py-2 text-[13px]"
+                  style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}>Try again</button>
+          <Link href="/" className="display rounded-[var(--radius)] border border-ink px-4 py-2 text-[13px] text-ink no-underline">Home</Link>
         </div>
       </div>
     </main>

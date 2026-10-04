@@ -198,7 +198,7 @@ function ConsentCard({ onDone }: { onDone: () => void }) {
               setBusy(false);
             }
           }}>I agree — continue</Button>
-          <Link href="/student/mark" className="display self-center px-2 text-[12px] text-ink">No thanks, I will use the classroom code</Link>
+          <Link href="/student/mark" className="display self-center px-2 text-[13px] text-ink">No thanks, I will use the classroom code</Link>
         </div>
       </div>
     </Card>

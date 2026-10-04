@@ -91,19 +91,19 @@ export default async function DashboardPage() {
   const unmarked = today?.periods.filter((p) => !p.marked).length ?? 0;
 
   return (
-    <main className="relative z-[1] mx-auto max-w-[1240px] px-4 pb-16 pt-6 md:px-5">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-3">
+    <main className="animate-page-in relative z-[1] mx-auto max-w-[1280px] px-4 pb-16 pt-7 md:px-8">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] pb-3">
         <div>
-          <h1 className="display m-0 text-[26px]">Authority dashboard</h1>
+          <h1 className="headline m-0 text-[30px] md:text-[40px]">Authority <span className="text-gradient">dashboard</span></h1>
           <p className="mt-0.5 font-mono text-xs text-ash">
             {me ? `${me.user.display_name} · ${ROLE_NAME[me.role] ?? me.role} · ` : ""}
             {new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", timeZone: me?.timezone })}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/staff/sessions" className="display rounded-[3px] border px-3.5 py-2 text-[12px] no-underline"
-                style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>Live sessions</Link>
-          <Link href="/staff/reports" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Reports</Link>
+          <Link href="/staff/sessions" className="display rounded-[var(--radius)] border px-3.5 py-2 text-[13px] no-underline"
+                style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}>Live sessions</Link>
+          <Link href="/staff/reports" className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink no-underline hover:bg-tint">Reports</Link>
         </div>
       </header>
 
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
               <thead>
                 <tr>
                   {["Time", "Subject", "Class", "State", "Present", "Late", "Absent", "Leave", "Unmarked", ""].map((h) => (
-                    <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
+                    <th key={h} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -174,8 +174,8 @@ export default async function DashboardPage() {
                       <td className="border-b border-rule px-2 py-1 text-right">
                         {p.session && p.session.state !== "closed" ? (
                           <Link href={`/staff/sessions/${p.session.id}`}
-                                className="display inline-block whitespace-nowrap rounded-[3px] border px-2.5 py-1.5 text-[11px] no-underline"
-                                style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>
+                                className="display inline-block whitespace-nowrap rounded-[var(--radius)] border px-2.5 py-1.5 text-[12px] no-underline"
+                                style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}>
                             {p.session.state === "active" ? "Take attendance" : "Open"}
                           </Link>
                         ) : p.session ? (
@@ -204,8 +204,8 @@ export default async function DashboardPage() {
                     <span>{c.label}</span>
                     <span className="font-mono tnum" style={{ color: below ? "var(--oxide)" : "var(--ink)" }}>{pct}% <span className="text-ash">({c.lectures})</span></span>
                   </div>
-                  <div className="relative mt-1 h-2 rounded-[2px]" style={{ background: "var(--tint-hard)" }} role="img" aria-label={`${c.label}: ${pct} percent`}>
-                    <div className="h-full rounded-[2px]" style={{ width: `${Math.min(100, pct)}%`, background: below ? "var(--status-absent)" : "var(--status-present)" }} />
+                  <div className="relative mt-1 h-2 rounded-[var(--radius-sm)]" style={{ background: "var(--tint-hard)" }} role="img" aria-label={`${c.label}: ${pct} percent`}>
+                    <div className="h-full rounded-[var(--radius-sm)]" style={{ width: `${Math.min(100, pct)}%`, background: below ? "var(--status-absent)" : "var(--status-present)" }} />
                     <div className="absolute top-0 h-full" style={{ left: `${classes.threshold_pct}%`, width: 2, background: "var(--ink)" }} />
                   </div>
                 </li>
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
 
       {/* Server housekeeping is for whoever runs the system, not for every teacher. */}
       {isAdmin && warnings.length ? (
-        <details className="mb-4 rounded-[3px] border border-rule bg-card shadow-card">
+        <details className="mb-4 rounded-[var(--radius)] border border-rule bg-card shadow-card">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
             <span className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: warnings.some((w) => /ANTI-SPOOF|EMAIL FAILING/i.test(w)) ? "var(--oxide)" : "var(--amber)" }} aria-hidden />
@@ -226,7 +226,7 @@ export default async function DashboardPage() {
                 {warnings.length} item{warnings.length === 1 ? "" : "s"} need attention: {warnings.map(warningTitle).join(", ")}
               </span>
             </span>
-            <span className="display text-[11px] text-ash">details</span>
+            <span className="display text-[12px] text-ash">details</span>
           </summary>
           <div className="grid gap-2 border-t border-rule px-4 py-3">
             {warnings.map((w) => (
@@ -290,9 +290,9 @@ export default async function DashboardPage() {
                 <table className="w-full border-collapse text-[13.5px]">
                   <thead>
                     <tr>
-                      <th className="label border-b-2 border-ink px-2 pb-1.5 text-left">Student</th>
-                      <th className="label border-b-2 border-ink px-2 pb-1.5 text-right">%</th>
-                      <th className="label border-b-2 border-ink px-2 pb-1.5 text-right">Needs</th>
+                      <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">Student</th>
+                      <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-right">%</th>
+                      <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-right">Needs</th>
                     </tr>
                   </thead>
                   <tbody>

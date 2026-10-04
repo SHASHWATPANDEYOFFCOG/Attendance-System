@@ -63,8 +63,8 @@ function ResetForm() {
         <Banner>Your password has been changed and other devices have been signed out.</Banner>
         <Link
           href="/login"
-          className="display inline-flex rounded-[3px] border px-4 py-2.5 text-[12px] no-underline"
-          style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}
+          className="display inline-flex rounded-[var(--radius)] border px-4 py-2.5 text-[13px] no-underline"
+          style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}
         >
           Sign in
         </Link>

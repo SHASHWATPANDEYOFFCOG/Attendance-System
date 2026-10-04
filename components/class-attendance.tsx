@@ -126,7 +126,7 @@ export function ClassCamera({ sessionId, live }: { sessionId: number; live: bool
           </p>
           {preview && preview !== "loading" && preview.src ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview.src} alt={`What ${cam.name} sees`} className="w-full rounded-[3px] border border-rule" />
+            <img src={preview.src} alt={`What ${cam.name} sees`} className="w-full rounded-[var(--radius)] border border-rule" />
           ) : null}
           {preview && preview !== "loading" && preview.error ? <Banner bad>{preview.error}</Banner> : null}
           <div className="flex flex-wrap gap-2">
@@ -305,7 +305,7 @@ export function TabletPhoto({ sessionId, live, onMarked }: { sessionId: number; 
           {viewfinder ? (
             <div className="grid gap-2">
               {cam.failure ? <Banner bad><CameraHelp reason={cam.failure} /></Banner> : null}
-              <video ref={cam.video} muted playsInline className="w-full rounded-[3px] border border-rule bg-black" style={{ maxHeight: 420, objectFit: "contain" }} />
+              <video ref={cam.video} muted playsInline className="w-full rounded-[var(--radius)] border border-rule bg-black" style={{ maxHeight: 420, objectFit: "contain" }} />
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" onClick={snap} busy={busy} disabled={!cam.ready}>Take photo</Button>
                 <Button onClick={() => setViewfinder(false)}>Close camera</Button>
@@ -338,11 +338,11 @@ export function TabletPhoto({ sessionId, live, onMarked }: { sessionId: number; 
           {shots.length ? (
             <div className={`grid gap-2 ${shots.length > 1 ? "md:grid-cols-2" : ""}`}>
               {shots.map((s, i) => (
-                <figure key={s.url} className="relative m-0 overflow-hidden rounded-[3px] border border-rule">
+                <figure key={s.url} className="relative m-0 overflow-hidden rounded-[var(--radius)] border border-rule">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={s.url} alt={`Class photo ${i + 1}`} className="block w-full" />
                   {s.faces.map((f, j) => f.box ? (
-                    <span key={j} className="absolute rounded-[2px]" title={f.name ?? f.verdict}
+                    <span key={j} className="absolute rounded-[var(--radius-sm)]" title={f.name ?? f.verdict}
                           style={{ left: `${f.box[0] * 100}%`, top: `${f.box[1] * 100}%`, width: `${(f.box[2] - f.box[0]) * 100}%`,
                                    height: `${(f.box[3] - f.box[1]) * 100}%`, border: `2px solid ${BOX_COLOR[f.verdict]}` }} />
                   ) : null)}
@@ -363,7 +363,7 @@ export function TabletPhoto({ sessionId, live, onMarked }: { sessionId: number; 
               <ul className="m-0 grid list-none gap-1.5 p-0 sm:grid-cols-2">
                 {candidates.map((c) => (
                   <li key={c.user_id}>
-                    <label className="flex cursor-pointer items-center gap-2.5 rounded-[3px] border border-rule px-2.5 py-2"
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-[var(--radius)] border border-rule px-2.5 py-2"
                            style={{ borderLeft: `4px solid ${BOX_COLOR[c.verdict]}`, opacity: c.already ? 0.6 : 1 }}>
                       <input type="checkbox" className="h-5 w-5" checked={ticked.has(c.user_id)} disabled={!!c.already}
                              onChange={() => toggle(c.user_id)} />

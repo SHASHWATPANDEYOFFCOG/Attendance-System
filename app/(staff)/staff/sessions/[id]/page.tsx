@@ -147,7 +147,7 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
             {data.state === "scheduled" ? <Button variant="primary" onClick={() => act("start")}>Start session</Button> : null}
             {data.state === "active" ? (
               <>
-                <Link href={`/present/${sid}`} target="_blank" className="display rounded-[3px] border px-3.5 py-2 text-[12px] no-underline" style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>Show QR full-screen</Link>
+                <Link href={`/present/${sid}`} target="_blank" className="display rounded-[var(--radius)] border px-3.5 py-2 text-[13px] no-underline" style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}>Show QR full-screen</Link>
                 <Button onClick={() => act("stop")}>Close session</Button>
               </>
             ) : null}
@@ -167,7 +167,7 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
       <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         {([["Present", c.present, "var(--status-present)"], ["Late", c.late, "var(--status-late)"], ["Absent", c.absent, "var(--status-absent)"],
           ["On leave", c.on_leave, "var(--status-leave)"], ["Unmarked", c.unmarked, "var(--ash)"], ["Class", c.roster, "var(--ink)"]] as const).map(([k, v, col]) => (
-          <div key={k} className="rounded-[3px] border border-rule bg-card py-2 text-center shadow-card">
+          <div key={k} className="rounded-[var(--radius)] border border-rule bg-card py-2 text-center shadow-card">
             <div className="label text-[10.5px]">{k}</div>
             <div className="font-mono text-[24px] font-semibold tnum" style={{ color: col }}>{v}</div>
           </div>
@@ -189,7 +189,7 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
               style={flash === r.user_id ? { background: "color-mix(in srgb, var(--verdant) 14%, transparent)" } : undefined}
             >
               <div className="flex min-w-0 items-center gap-3">
-                {r.status ? <Mark status={r.status} /> : <span className="inline-block h-6 w-6 rounded-[2px] border border-dashed border-rule" aria-label="not marked" />}
+                {r.status ? <Mark status={r.status} /> : <span className="inline-block h-6 w-6 rounded-[var(--radius-sm)] border border-dashed border-rule" aria-label="not marked" />}
                 <div className="min-w-0">
                   <div className="truncate text-[14px] font-semibold">{r.display_name}</div>
                   <div className="font-mono text-[11px] text-ash">
@@ -210,9 +210,9 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
                       onClick={() => mark(r, status)}
                       aria-pressed={r.status === status}
                       title={status.replace("_", " ")}
-                      className="h-9 w-9 cursor-pointer rounded-[3px] border font-mono text-[13px] font-semibold"
+                      className="h-9 w-9 cursor-pointer rounded-[var(--radius)] border font-mono text-[13px] font-semibold"
                       style={r.status === status
-                        ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }
+                        ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }
                         : { background: "transparent", borderColor: "var(--rule)", color: "var(--ink)" }}
                     >
                       {letter}

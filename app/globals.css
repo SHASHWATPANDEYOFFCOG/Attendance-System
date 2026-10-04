@@ -1,125 +1,161 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   Attendance register design system — Tailwind v4 (tokens live here, there is
-   no tailwind.config.js in v4).
+   Design system — tokens live here (Tailwind v4: no tailwind.config.js).
 
-   Palette, typefaces and the register metaphor carry over from the vanilla
-   web/ build; see web/DESIGN.md. The chart layer is new and was DERIVED WITH
-   THE VALIDATOR, not by eye: the brand tokens fail as chart colour (ink sits
-   outside the lightness band, ash↔verdant collapse under protanopia), so chart
-   steps are separate values drawn from the same hue families.
+   Two layers:
+   1. Foundation + brand tokens (below). The legacy names the whole app already
+      uses — paper, card, rule, ink, ash, oxide, amber, verdant, tint — are kept
+      and re-pointed, so every existing screen adopts the new look without
+      touching its logic. New names (accent, grad-*, surface-*, radius-*, ease-*)
+      are for new work.
+   2. Status colours are RESERVED for attendance meaning (present / late /
+      absent / leave / excused) and always paired with a letter (P/L/A/O/E), so
+      meaning never rests on colour alone. Chart series use their own slots.
+
+   Theme: follows the system unless the user picked one (data-theme, saved in
+   localStorage and applied before first paint by app/layout.tsx).
    ========================================================================== */
 
 :root {
-  /* ---- brand surfaces & ink (light) ---- */
-  --paper:   #F4F5F0;
-  --card:    #FCFCF9;
-  --rule:    #D9DDD3;
-  --ink:     #16304F;
-  --oxide:   #9A3B2E;
-  --amber:   #A8731A;
-  --ash:     #6E7468;
-  --verdant: #2E6B4F;
-  --focus:   #16304F;
+  /* ---- foundation (light) ---- */
+  --paper:      #F5F6FB;          /* page background */
+  --card:       #FFFFFF;          /* surface */
+  --surface-2:  #F0F2FA;          /* inset / secondary surface */
+  --glass:      rgb(255 255 255 / 0.72);
+  --rule:       #E2E5F0;          /* borders */
+  --ink:        #0D1330;          /* primary text */
+  --ash:        #5D6585;          /* secondary text */
+  --muted:      #8A91AE;
+  --focus:      #4F5BFF;
 
   --card-hover: #FFFFFF;
-  --tint:       rgb(22 48 79 / 0.035);
-  --tint-hard:  rgb(22 48 79 / 0.07);
+  --tint:       rgb(79 91 255 / 0.05);
+  --tint-hard:  rgb(79 91 255 / 0.10);
 
-  /* ---- chart layer: VALIDATED, do not hand-edit ----
-     node scripts/validate_palette.js "#3D6DA8,#B33A2B,#3E9970" \
-       --mode light --surface "#FCFCF9" --pairs all   ->  all 5 checks PASS
-     Three slots is deliberate: department comparison is 3 series. A 4th gold
-     slot collapsed into the oxide under deuteranopia; the guidance is to cut
-     series rather than invent hues. */
-  --series-1: #3D6DA8;
-  --series-2: #B33A2B;
-  --series-3: #3E9970;
+  /* ---- brand ---- */
+  --electric: #3D6BFF;
+  --violet:   #7C4DFF;
+  --cyan:     #06B6D4;
+  --magenta:  #E0459B;
+  --lime:     #65A30D;
+  --orange:   #F97316;
+  --accent:   var(--electric);
+  --on-accent: #FFFFFF;
 
-  /* Sequential ramp (magnitude — the weekday heatmap). One hue, light→dark. */
-  --seq-0: #EEF2F7;
-  --seq-1: #D3DFEC;
-  --seq-2: #A8C0DC;
-  --seq-3: #7C9FC9;
-  --seq-4: #5180B5;
-  --seq-5: #3D6DA8;
+  --grad-primary: linear-gradient(120deg, #3D6BFF 0%, #7C4DFF 100%);
+  --grad-cool:    linear-gradient(120deg, #06B6D4 0%, #3D6BFF 100%);
+  --grad-warm:    linear-gradient(120deg, #F97316 0%, #E0459B 100%);
+  --grad-aurora:  linear-gradient(120deg, #3D6BFF 0%, #7C4DFF 45%, #E0459B 100%);
 
-  /* Status is RESERVED — never reused as "series 4", and always paired with a
-     letterform (P/L/A/E) so meaning never rests on colour alone. */
-  --status-present: #2E6B4F;
-  --status-late:    #A8731A;
-  --status-absent:  #9A3B2E;
-  --status-excused: #6E7468;
-  /* On leave reuses the validated series-1 blue: distinct from present/late/absent under all
-     three common colour-vision deficiencies, and always paired with the letter "O". */
-  --status-leave:   #3D6DA8;
+  /* ---- semantic ---- */
+  --oxide:   #D9264F;             /* error / destructive */
+  --amber:   #B86E00;             /* warning */
+  --verdant: #0E9F6E;             /* success */
+  --info:    #3D6BFF;
 
-  --shadow-sm: 0 1px 0 rgb(22 48 79 / 0.05);
-  --shadow-md: 0 1px 0 rgb(22 48 79 / 0.06), 0 8px 24px -18px rgb(22 48 79 / 0.5);
-  --shadow-lg: 0 1px 0 rgb(22 48 79 / 0.07), 0 14px 34px -20px rgb(22 48 79 / 0.55);
+  /* ---- charts (distinct hues, readable on the light surface) ---- */
+  --series-1: #3D6BFF;
+  --series-2: #E0459B;
+  --series-3: #0E9F6E;
+  --seq-0: #EEF1FF; --seq-1: #D6DDFF; --seq-2: #AEBBFF; --seq-3: #8495FF; --seq-4: #5C70FF; --seq-5: #3D4FE0;
+
+  /* ---- attendance status (reserved) ---- */
+  --status-present: #0E9F6E;
+  --status-late:    #B86E00;
+  --status-absent:  #D9264F;
+  --status-excused: #6B7290;
+  --status-leave:   #3D6BFF;
+
+  /* ---- shape, depth, motion ---- */
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --shadow-sm: 0 1px 2px rgb(13 19 48 / 0.06);
+  --shadow-md: 0 1px 2px rgb(13 19 48 / 0.05), 0 10px 30px -18px rgb(40 50 140 / 0.35);
+  --shadow-lg: 0 2px 4px rgb(13 19 48 / 0.05), 0 22px 50px -24px rgb(40 50 140 / 0.45);
+  --shadow-glow: 0 10px 34px -12px rgb(79 91 255 / 0.55);
+  --blur: 18px;
+  --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 420ms;
 
   --line-h: 30px;
   color-scheme: light;
 }
 
-/* Dark is SELECTED, not flipped: its lightness band is L 0.48–0.67 versus
-   0.43–0.77 for light, so chart steps are mid-tones, not pale pastels.
-     node scripts/validate_palette.js "#5289C4,#D45C3E,#3FA97E" \
-       --mode dark --surface "#18202A" --pairs all   ->  all 5 checks PASS */
-
+/* ---- dark: deep navy, bright accents, soft borders ---- */
 :root[data-theme="dark"] {
-  --paper:   #11161D;
-  --card:    #18202A;
-  --rule:    #2B3542;
-  --ink:     #E6EBF2;
-  --oxide:   #E4785F;
-  --amber:   #E2A945;
-  --ash:     #93A1B2;
-  --verdant: #5DBF92;
-  --focus:   #9FC2E8;
+  --paper:      #070A16;
+  --card:       #0D1226;
+  --surface-2:  #121935;
+  --glass:      rgb(16 22 46 / 0.66);
+  --rule:       rgb(148 160 255 / 0.13);
+  --ink:        #EEF1FF;
+  --ash:        #9AA3C7;
+  --muted:      #6E779E;
+  --focus:      #8EA2FF;
+  --card-hover: #111834;
+  --tint:       rgb(142 162 255 / 0.06);
+  --tint-hard:  rgb(142 162 255 / 0.12);
 
-  --card-hover: #1D2733;
-  --tint:       rgb(230 235 242 / 0.045);
-  --tint-hard:  rgb(230 235 242 / 0.09);
+  --electric: #5C82FF;
+  --violet:   #9B6BFF;
+  --cyan:     #22D3EE;
+  --magenta:  #F472B6;
+  --lime:     #A3E635;
+  --orange:   #FB923C;
+  --grad-primary: linear-gradient(120deg, #4F7BFF 0%, #8B5CF6 100%);
+  --grad-cool:    linear-gradient(120deg, #22D3EE 0%, #4F7BFF 100%);
+  --grad-warm:    linear-gradient(120deg, #FB923C 0%, #F472B6 100%);
+  --grad-aurora:  linear-gradient(120deg, #4F7BFF 0%, #8B5CF6 45%, #F472B6 100%);
 
-  --series-1: #5289C4;
-  --series-2: #D45C3E;
-  --series-3: #3FA97E;
+  --oxide:   #FF6B8B;
+  --amber:   #FFB547;
+  --verdant: #34D399;
+  --info:    #7C9CFF;
 
-  --seq-0: #1A222C;
-  --seq-1: #22303F;
-  --seq-2: #2C4358;
-  --seq-3: #375875;
-  --seq-4: #446E96;
-  --seq-5: #5289C4;
+  --series-1: #6B8CFF;
+  --series-2: #F472B6;
+  --series-3: #34D399;
+  --seq-0: #121935; --seq-1: #1B2550; --seq-2: #26357A; --seq-3: #3448A8; --seq-4: #4A62D6; --seq-5: #6B8CFF;
 
-  --status-present: #5DBF92;
-  --status-late:    #E2A945;
-  --status-absent:  #E4785F;
-  --status-excused: #93A1B2;
-  --status-leave:   #5289C4;
+  --status-present: #34D399;
+  --status-late:    #FFB547;
+  --status-absent:  #FF6B8B;
+  --status-excused: #9AA3C7;
+  --status-leave:   #7C9CFF;
 
-  --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 1px 0 rgb(0 0 0 / 0.35), 0 8px 24px -18px rgb(0 0 0 / 0.9);
-  --shadow-lg: 0 1px 0 rgb(0 0 0 / 0.4),  0 14px 34px -20px rgb(0 0 0 / 0.95);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 14px 40px -24px rgb(0 0 0 / 0.9);
+  --shadow-lg: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 26px 60px -26px rgb(0 0 0 / 0.95);
+  --shadow-glow: 0 10px 40px -10px rgb(110 120 255 / 0.55);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #11161D; --card: #18202A; --rule: #2B3542; --ink: #E6EBF2;
-    --oxide: #E4785F; --amber: #E2A945; --ash: #93A1B2; --verdant: #5DBF92;
-    --focus: #9FC2E8; --card-hover: #1D2733;
-    --tint: rgb(230 235 242 / 0.045); --tint-hard: rgb(230 235 242 / 0.09);
-    --series-1: #5289C4; --series-2: #D45C3E; --series-3: #3FA97E;
-    --seq-0: #1A222C; --seq-1: #22303F; --seq-2: #2C4358;
-    --seq-3: #375875; --seq-4: #446E96; --seq-5: #5289C4;
-    --status-present: #5DBF92; --status-late: #E2A945;
-    --status-absent: #E4785F; --status-excused: #93A1B2; --status-leave: #5289C4;
-    --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
-    --shadow-md: 0 1px 0 rgb(0 0 0 / 0.35), 0 8px 24px -18px rgb(0 0 0 / 0.9);
-    --shadow-lg: 0 1px 0 rgb(0 0 0 / 0.4),  0 14px 34px -20px rgb(0 0 0 / 0.95);
+    --paper: #070A16; --card: #0D1226; --surface-2: #121935; --glass: rgb(16 22 46 / 0.66);
+    --rule: rgb(148 160 255 / 0.13); --ink: #EEF1FF; --ash: #9AA3C7; --muted: #6E779E;
+    --focus: #8EA2FF; --card-hover: #111834;
+    --tint: rgb(142 162 255 / 0.06); --tint-hard: rgb(142 162 255 / 0.12);
+    --electric: #5C82FF; --violet: #9B6BFF; --cyan: #22D3EE; --magenta: #F472B6; --lime: #A3E635; --orange: #FB923C;
+    --grad-primary: linear-gradient(120deg, #4F7BFF 0%, #8B5CF6 100%);
+    --grad-cool: linear-gradient(120deg, #22D3EE 0%, #4F7BFF 100%);
+    --grad-warm: linear-gradient(120deg, #FB923C 0%, #F472B6 100%);
+    --grad-aurora: linear-gradient(120deg, #4F7BFF 0%, #8B5CF6 45%, #F472B6 100%);
+    --oxide: #FF6B8B; --amber: #FFB547; --verdant: #34D399; --info: #7C9CFF;
+    --series-1: #6B8CFF; --series-2: #F472B6; --series-3: #34D399;
+    --seq-0: #121935; --seq-1: #1B2550; --seq-2: #26357A; --seq-3: #3448A8; --seq-4: #4A62D6; --seq-5: #6B8CFF;
+    --status-present: #34D399; --status-late: #FFB547; --status-absent: #FF6B8B;
+    --status-excused: #9AA3C7; --status-leave: #7C9CFF;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 14px 40px -24px rgb(0 0 0 / 0.9);
+    --shadow-lg: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 26px 60px -26px rgb(0 0 0 / 0.95);
+    --shadow-glow: 0 10px 40px -10px rgb(110 120 255 / 0.55);
     color-scheme: dark;
   }
 }
@@ -128,104 +164,209 @@
 @theme inline {
   --color-paper:   var(--paper);
   --color-card:    var(--card);
+  --color-surface: var(--surface-2);
   --color-rule:    var(--rule);
   --color-ink:     var(--ink);
   --color-oxide:   var(--oxide);
   --color-amber:   var(--amber);
   --color-ash:     var(--ash);
+  --color-muted:   var(--muted);
   --color-verdant: var(--verdant);
   --color-tint:    var(--tint);
+  --color-accent:  var(--accent);
+  --color-electric: var(--electric);
+  --color-violet:  var(--violet);
+  --color-cyan:    var(--cyan);
+  --color-magenta: var(--magenta);
 
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --color-series-3: var(--series-3);
 
-  /* next/font injects the hashed family into --font-*-loaded (see app/layout.tsx); the named
-     fallbacks keep the design intact if the font request fails. */
-  --font-label: var(--font-label-loaded), "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
-  --font-sans:  var(--font-sans-loaded), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono:  var(--font-mono-loaded), "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  /* next/font injects the hashed family into --font-*-loaded (see app/layout.tsx). */
+  --font-label: var(--font-sans-loaded), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:  var(--font-sans-loaded), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:  var(--font-mono-loaded), "Geist Mono", ui-monospace, SFMono-Regular, monospace;
 
   --shadow-card: var(--shadow-md);
   --shadow-lift: var(--shadow-lg);
+  --shadow-glow: var(--shadow-glow);
 }
 
 * { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
 
 body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 240ms cubic-bezier(0.22, 0.8, 0.3, 1),
-              color 240ms cubic-bezier(0.22, 0.8, 0.3, 1);
+  text-rendering: optimizeLegibility;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
 }
 
-/* Paper grain — fixed, non-interactive, painted once, never repaints on scroll. */
+/* ---------------------------------------------------------------- ambient background
+   Two fixed, non-interactive layers painted once: drifting colour fields (::after)
+   and a fine grid fading out from the top (::before). Cheap: transform-only motion,
+   paused under reduced motion. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+  background-image:
+    linear-gradient(to right, var(--tint-hard) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--tint-hard) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 75%);
+  opacity: 0.55;
 }
-:root[data-theme="dark"] body::before { opacity: 0.28; }
+body::after {
+  content: "";
+  position: fixed;
+  inset: -20vmax;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40vmax 30vmax at 18% 12%, color-mix(in srgb, var(--electric) 22%, transparent), transparent 70%),
+    radial-gradient(34vmax 26vmax at 82% 8%, color-mix(in srgb, var(--violet) 20%, transparent), transparent 70%),
+    radial-gradient(30vmax 24vmax at 70% 88%, color-mix(in srgb, var(--magenta) 12%, transparent), transparent 70%),
+    radial-gradient(28vmax 22vmax at 8% 82%, color-mix(in srgb, var(--cyan) 12%, transparent), transparent 70%);
+  filter: blur(10px);
+  animation: aurora-drift 38s var(--ease-out) infinite alternate;
+  opacity: 0.85;
+}
+:root[data-theme="light"] body::after { opacity: 0.55; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) body::after { opacity: 0.55; } }
+@keyframes aurora-drift {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to   { transform: translate3d(-3vmax, 2vmax, 0) rotate(6deg); }
+}
 
 /* ---------------------------------------------------------------- typography */
 
-/* No `display` here on purpose: forcing block breaks <th>, which must stay table-cell.
-   Callers that need a block add Tailwind's `block`. */
+/* Small uppercase eyebrow / field label. No `display` here: it must stay table-cell in <th>. */
 .label {
   font-family: var(--font-label);
   text-transform: uppercase;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.08em;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ash);
 }
+/* Headline face: tight tracking, strong weight. Used for headings and button text. */
 .display {
   font-family: var(--font-label);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 600;
+  letter-spacing: -0.012em;
+  font-weight: 650;
+}
+.headline {
+  font-family: var(--font-label);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+.text-gradient {
+  background: var(--grad-aurora);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* The signature element: ruled register paper. */
+/* Register lines, kept as a quiet texture on "ruled" cards. */
 .ruled {
   background-image: repeating-linear-gradient(
     to bottom, transparent, transparent calc(var(--line-h) - 1px),
-    var(--rule) var(--line-h));
+    var(--tint-hard) var(--line-h));
 }
+
+/* ---------------------------------------------------------------- surfaces */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+}
+.surface-interactive {
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out);
+}
+.surface-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--rule));
+}
+/* Gradient hairline border for featured surfaces. */
+.ring-gradient {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    var(--grad-aurora) border-box;
+}
+
+/* ---------------------------------------------------------------- buttons
+   Shared by <Button> and link-buttons. The primary gradient shifts slightly on hover;
+   the arrow (if any) nudges forward. Press = scale down. */
+.btn {
+  position: relative;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur) var(--ease-out),
+              background-position var(--dur-slow) var(--ease-out), opacity var(--dur) var(--ease-out),
+              background-color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn-primary { background-size: 160% 100%; background-position: 0% 50%; box-shadow: var(--shadow-glow); }
+.btn-primary:hover:not(:disabled) { background-position: 100% 50%; }
+.btn .btn-arrow { transition: transform var(--dur) var(--ease-out); }
+.btn:hover .btn-arrow { transform: translateX(3px); }
 
 /* ------------------------------------------------------------------- focus */
 :focus { outline: none; }
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 6px;
 }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
 /* --------------------------------------------------------------- motion */
 @keyframes row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes stamp-in {
   0%   { transform: rotate(-14deg) scale(2.4); opacity: 0; }
   60%  { transform: rotate(-4deg) scale(0.94); opacity: 1; }
   100% { transform: rotate(-4deg) scale(1); }
 }
-.animate-row-in { animation: row-in 240ms cubic-bezier(0.22, 0.8, 0.3, 1) both; }
-.animate-stamp  { animation: stamp-in 420ms cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+.animate-row-in { animation: row-in var(--dur) var(--ease-out) both; }
+.animate-page-in { animation: page-in 360ms var(--ease-out) both; }
+.animate-pop-in { animation: pop-in var(--dur) var(--ease-out) both; }
+.animate-stamp  { animation: stamp-in 420ms var(--ease-out) both; }
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--tint-hard) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* Scroll reveal (components/reveal.tsx adds .is-visible). */
+/* Hidden only once scripts run (html.js, set in app/layout.tsx): without JS everything shows. */
+.js .reveal { opacity: 0; transform: translateY(18px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+.js .reveal.is-visible { opacity: 1; transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+  .js .reveal { opacity: 1; transform: none; }
+  body::after { animation: none; }
 }
 
 /* Touch: every control clears 44px. */
@@ -233,7 +374,7 @@ body::before {
   button, [role="button"], a.btn, input, select { min-height: 44px; }
 }
 
-/* Recharts inherits our tokens instead of its own defaults. */
+/* Recharts inherits the tokens instead of its own defaults. */
 .recharts-cartesian-axis-tick text {
   fill: var(--ash);
   font-family: var(--font-mono);

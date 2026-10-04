@@ -54,7 +54,7 @@ export function AudiencePicker({ value, onChange, error }: { value: Audience; on
         <>
           <TextField label="Find students" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or roll number (2+ letters)" />
           {found.length ? (
-            <div className="grid max-h-[180px] gap-1 overflow-y-auto rounded-[3px] border border-rule p-2">
+            <div className="grid max-h-[180px] gap-1 overflow-y-auto rounded-[var(--radius)] border border-rule p-2">
               {found.map((o) => <Checkbox key={o.id} label={o.label} checked={value.ids.includes(o.id)} onChange={(e) => toggle(o, e.target.checked)} />)}
             </div>
           ) : null}
@@ -63,7 +63,7 @@ export function AudiencePicker({ value, onChange, error }: { value: Audience; on
           ) : null}
         </>
       ) : value.type !== "all" ? (
-        <div className="grid max-h-[180px] gap-1 overflow-y-auto rounded-[3px] border border-rule p-2">
+        <div className="grid max-h-[180px] gap-1 overflow-y-auto rounded-[var(--radius)] border border-rule p-2">
           {opts.length ? opts.map((o) => <Checkbox key={o.id} label={o.label} checked={value.ids.includes(o.id)} onChange={(e) => toggle(o, e.target.checked)} />)
             : <span className="text-[13px] text-ash">Nothing to choose from.</span>}
         </div>

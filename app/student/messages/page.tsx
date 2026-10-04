@@ -26,8 +26,8 @@ function Inner() {
       <nav aria-label="Messages" className="mb-4 flex gap-1">
         {([["inbox", "Inbox"], ["notices", "Notice board"]] as const).map(([k, l]) => (
           <Link key={k} href={`/student/messages${k === "notices" ? "?tab=notices" : ""}`} aria-current={tab === k ? "page" : undefined}
-                className="display rounded-[3px] border px-3 py-1.5 text-[11.5px] no-underline"
-                style={tab === k ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)" }}>
+                className="display rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px] no-underline"
+                style={tab === k ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" } : { borderColor: "var(--rule)", color: "var(--ink)" }}>
             {l}
           </Link>
         ))}

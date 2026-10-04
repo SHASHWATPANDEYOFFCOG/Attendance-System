@@ -80,7 +80,7 @@ export default async function ReportsPage({
 
   return (
     <main className="relative z-[1] mx-auto max-w-[1240px] px-4 pb-16 pt-6 md:px-5">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-3">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] pb-3">
         <div>
           <h1 className="display m-0 text-[26px]">Reports</h1>
           <p className="mt-0.5 font-mono text-xs text-ash">
@@ -90,7 +90,7 @@ export default async function ReportsPage({
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard"
-            className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint"
+            className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint"
           >
             Dashboard
           </Link>
@@ -112,18 +112,18 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">From</span>
             <input type="date" name="date_from" defaultValue={sp.date_from ?? ""}
-                   className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
+                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
           </label>
           <label className="block">
             <span className="label block">To</span>
             <input type="date" name="date_to" defaultValue={sp.date_to ?? ""}
-                   className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
+                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
           </label>
 
           <label className="block">
             <span className="label block">Department</span>
             <select name="department_id" defaultValue={sp.department_id ?? ""}
-                    className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
               <option value="">All</option>
               {options?.departments.map((d) => (
                 <option key={d.id} value={d.id}>{d.label}</option>
@@ -134,7 +134,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Subject</span>
             <select name="subject_id" defaultValue={sp.subject_id ?? ""}
-                    className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
               <option value="">All</option>
               {options?.subjects.map((s) => (
                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -145,7 +145,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Section</span>
             <select name="section_id" defaultValue={sp.section_id ?? ""}
-                    className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
               <option value="">All</option>
               {options?.sections.map((s) => (
                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -156,7 +156,7 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Status</span>
             <select name="status" defaultValue={sp.status ?? ""}
-                    className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
+                    className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink">
               <option value="">Any</option>
               {options?.statuses.map((s) => (
                 <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
@@ -167,17 +167,17 @@ export default async function ReportsPage({
           <label className="block">
             <span className="label block">Student</span>
             <input name="search" defaultValue={sp.search ?? ""} placeholder="name or roll"
-                   className="w-full rounded-[3px] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
+                   className="w-full rounded-[var(--radius)] border border-rule bg-card px-2.5 py-2 text-[14px] text-ink" />
           </label>
 
           <div className="flex items-end gap-2">
             <button type="submit"
-                    className="display cursor-pointer rounded-[3px] border px-3.5 py-2 text-[12px]"
-                    style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>
+                    className="display cursor-pointer rounded-[var(--radius)] border px-3.5 py-2 text-[13px]"
+                    style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}>
               Apply
             </button>
             <Link href="/reports"
-                  className="display rounded-[3px] border border-rule px-3.5 py-2 text-[12px] text-ash hover:bg-tint">
+                  className="display rounded-[var(--radius)] border border-rule px-3.5 py-2 text-[13px] text-ash hover:bg-tint">
               Clear
             </Link>
           </div>
@@ -206,7 +206,7 @@ export default async function ReportsPage({
                       : undefined
                   }
                   className={
-                    "display rounded-[3px] border border-rule px-3 py-1.5 text-[11px] hover:bg-tint " +
+                    "display rounded-[var(--radius)] border border-rule px-3 py-1.5 text-[12px] hover:bg-tint " +
                     (tooBig ? "pointer-events-none opacity-40 text-ash" : "text-ink")
                   }
                 >
@@ -229,7 +229,7 @@ export default async function ReportsPage({
                 <thead>
                   <tr>
                     {["", "Date", "Time", "Roll", "Student", "Subject", "Section", "Status", "Source"].map((h) => (
-                      <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left whitespace-nowrap">
+                      <th key={h} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left whitespace-nowrap">
                         {h}
                       </th>
                     ))}
@@ -261,7 +261,7 @@ export default async function ReportsPage({
                 <Link
                   href={pageLink(Math.max(1, meta.page - 1))}
                   aria-disabled={meta.page <= 1}
-                  className="display rounded-[3px] border border-rule px-3 py-1.5 text-[11px] text-ink hover:bg-tint aria-disabled:opacity-40"
+                  className="display rounded-[var(--radius)] border border-rule px-3 py-1.5 text-[12px] text-ink hover:bg-tint aria-disabled:opacity-40"
                 >
                   Previous
                 </Link>
@@ -271,7 +271,7 @@ export default async function ReportsPage({
                 <Link
                   href={pageLink(Math.min(meta.pages, meta.page + 1))}
                   aria-disabled={meta.page >= meta.pages}
-                  className="display rounded-[3px] border border-rule px-3 py-1.5 text-[11px] text-ink hover:bg-tint aria-disabled:opacity-40"
+                  className="display rounded-[var(--radius)] border border-rule px-3 py-1.5 text-[12px] text-ink hover:bg-tint aria-disabled:opacity-40"
                 >
                   Next
                 </Link>

@@ -104,7 +104,7 @@ export default function SessionsPage() {
                     {([["Present", c.present, "var(--status-present)"], ["Late", c.late, "var(--status-late)"],
                       ["Absent", c.absent, "var(--status-absent)"], ["On leave", c.on_leave, "var(--status-leave)"],
                       ["Unmarked", c.unmarked, "var(--ash)"], ["Class", c.roster, "var(--ink)"]] as const).map(([k, v, col]) => (
-                      <div key={k} className="rounded-[3px] border border-rule py-1.5">
+                      <div key={k} className="rounded-[var(--radius)] border border-rule py-1.5">
                         <dt className="label text-[10.5px]">{k}</dt>
                         <dd className="m-0 font-mono text-[20px] font-semibold tnum" style={{ color: col }}>{v}</dd>
                       </div>
@@ -117,20 +117,20 @@ export default function SessionsPage() {
                   ) : null}
                   {s ? (
                     <Link href={`/staff/sessions/${s.id}`}
-                          className="display rounded-[3px] border px-3.5 py-2 text-[12px] no-underline"
+                          className="display rounded-[var(--radius)] border px-3.5 py-2 text-[13px] no-underline"
                           style={s.state === "active"
-                            ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }
+                            ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }
                             : { borderColor: "var(--ink)", color: "var(--ink)" }}>
                       {s.state === "active" ? "Take attendance" : "Open"}
                     </Link>
                   ) : null}
                   {s?.state === "active" ? (
                     <>
-                      <Link href={`/present/${s.id}`} target="_blank" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Show QR full-screen</Link>
+                      <Link href={`/present/${s.id}`} target="_blank" className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink no-underline hover:bg-tint">Show QR full-screen</Link>
                       <Button busy={busy === `s-${s.id}`} onClick={() => stop(s.id)}>Close session</Button>
                     </>
                   ) : null}
-                  {p.slot_id ? <Link href={`/mark/${p.slot_id}${data.date ? `?date=${data.date}` : ""}`} className="display self-center px-2 text-[11.5px] text-ink">Register</Link> : null}
+                  {p.slot_id ? <Link href={`/mark/${p.slot_id}${data.date ? `?date=${data.date}` : ""}`} className="display self-center px-2 text-[12.5px] text-ink">Register</Link> : null}
                 </div>
               </Card>
             );

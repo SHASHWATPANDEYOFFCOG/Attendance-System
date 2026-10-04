@@ -26,7 +26,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   return (
     <li className="flex gap-3">
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-[13px] font-semibold"
-            style={{ background: "var(--ink)", color: "var(--card)" }}>{n}</span>
+            style={{ background: "var(--grad-primary)", color: "var(--on-accent)" }}>{n}</span>
       <div className="min-w-0">
         <strong className="text-[15px]">{title}</strong>
         <div className="text-[14px] text-ink/85">{children}</div>
@@ -38,16 +38,16 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 export default async function GuidePage() {
   const p = await policy();
   return (
-    <PublicShell width={820} subtitle="User guide">
+    <PublicShell brandHeading={false} width={820} subtitle="User guide">
       <div className="grid gap-4">
         <h1 className="display m-0 text-center text-[22px]">User guide</h1>
         <nav aria-label="Guide sections" className="flex flex-wrap justify-center gap-1.5 text-[13px]">
           {[["#administrator", "Administrator"], ["#authority", "Authority"], ["#tablet", "Tablet"], ["#teachers", "Taking attendance"], ["#students", "Students"]].map(([href, label]) => (
-            <a key={href} href={href} className="display rounded-[3px] border border-rule px-3 py-1.5 text-[11.5px] text-ink no-underline hover:bg-tint">{label}</a>
+            <a key={href} href={href} className="display rounded-[var(--radius)] border border-rule px-3 py-1.5 text-[12.5px] text-ink no-underline hover:bg-tint">{label}</a>
           ))}
         </nav>
 
-        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="administrator">
+        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="administrator">
           <h2 id="administrator" className="display m-0 mb-1 text-[20px]">Administrator guide</h2>
           <p className="mb-3 mt-0 text-[13.5px] text-ash">Administrators control the whole system. You need an authority account and the administrator code.</p>
           <ol className="m-0 grid list-none gap-3.5 p-0">
@@ -83,7 +83,7 @@ export default async function GuidePage() {
           </ol>
         </section>
 
-        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="authority">
+        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="authority">
           <h2 id="authority" className="display m-0 mb-1 text-[20px]">Authority guide (teachers and HODs)</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Get an account">
@@ -108,7 +108,7 @@ export default async function GuidePage() {
           </ol>
         </section>
 
-        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="tablet">
+        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="tablet">
           <h2 id="tablet" className="display m-0 mb-1 text-[20px]">Tablet guide</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Open the website on the tablet">Use its browser (Chrome or Safari). Add it to the home screen for an app-like icon.</Step>
@@ -124,7 +124,7 @@ export default async function GuidePage() {
           </ol>
         </section>
 
-        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="students">
+        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="students">
           <h2 id="students" className="display m-0 mb-3 text-[20px]">Student guide</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Register">
@@ -155,14 +155,14 @@ export default async function GuidePage() {
               classes in a row you need. Download your history as a PDF from <em>History</em>.
             </Step>
           </ol>
-          <div className="mt-4 rounded-[3px] bg-tint p-3 text-[13.5px]">
+          <div className="mt-4 rounded-[var(--radius)] bg-tint p-3 text-[13.5px]">
             <strong>Camera or location blocked?</strong> On Android Chrome: tap the lock icon by the address → Permissions → allow
             Camera and Location. On iPhone Safari: tap <strong>aA</strong> → Website Settings → allow Camera and Location, and check
             Settings → Privacy &amp; Security → Location Services is on.
           </div>
         </section>
 
-        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="teachers">
+        <section className="rounded-[var(--radius)] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="teachers">
           <h2 id="teachers" className="display m-0 mb-3 text-[20px]">Taking attendance (teachers)</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Your classes">

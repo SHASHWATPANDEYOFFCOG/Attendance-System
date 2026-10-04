@@ -278,7 +278,7 @@ export function Register({ initial }: { initial: RosterPayload }) {
       {restored ? (
         <div
           role="status"
-          className="mb-3 rounded-r-[2px] border-l-4 px-3.5 py-2.5 text-[13.5px]"
+          className="mb-3 rounded-[var(--radius-sm)] border-l-4 px-3.5 py-2.5 text-[13.5px]"
           style={{
             borderLeftColor: "var(--amber)",
             background: "color-mix(in srgb, var(--amber) 10%, transparent)",
@@ -291,7 +291,7 @@ export function Register({ initial }: { initial: RosterPayload }) {
       {locked ? (
         <div
           role="status"
-          className="mb-3 rounded-r-[2px] border-l-4 px-3.5 py-2.5 text-[13.5px]"
+          className="mb-3 rounded-[var(--radius-sm)] border-l-4 px-3.5 py-2.5 text-[13.5px]"
           style={{
             borderLeftColor: "var(--oxide)",
             background: "color-mix(in srgb, var(--oxide) 11%, transparent)",
@@ -308,8 +308,8 @@ export function Register({ initial }: { initial: RosterPayload }) {
           type="button"
           onClick={markAllPresent}
           disabled={locked}
-          className="display cursor-pointer rounded-[3px] border px-3.5 py-2 text-[12px] disabled:opacity-50"
-          style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}
+          className="display cursor-pointer rounded-[var(--radius)] border px-3.5 py-2 text-[13px] disabled:opacity-50"
+          style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}
         >
           Mark all present
         </button>
@@ -317,7 +317,7 @@ export function Register({ initial }: { initial: RosterPayload }) {
           type="button"
           onClick={() => void save()}
           disabled={locked || state === "saving" || !dirty.length}
-          className="display cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint disabled:opacity-50"
+          className="display cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint disabled:opacity-50"
         >
           {state === "saving" ? "Saving..." : dirty.length ? `Save ${dirty.length} change(s)` : "Saved"}
         </button>
@@ -349,10 +349,10 @@ export function Register({ initial }: { initial: RosterPayload }) {
           </caption>
           <thead>
             <tr>
-              <th className="label border-b-2 border-ink px-2 pb-1.5 text-left">Roll</th>
-              <th className="label border-b-2 border-ink px-2 pb-1.5 text-left">Name</th>
-              <th className="label border-b-2 border-ink px-2 pb-1.5 text-left">Mark</th>
-              <th className="label border-b-2 border-ink px-2 pb-1.5 text-right">Set</th>
+              <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">Roll</th>
+              <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">Name</th>
+              <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">Mark</th>
+              <th className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-right">Set</th>
             </tr>
           </thead>
           <tbody>
@@ -399,7 +399,7 @@ export function Register({ initial }: { initial: RosterPayload }) {
                           setCursor(i);
                           setMark(r.user_id, s);
                         }}
-                        className="display ml-1 cursor-pointer rounded-[3px] border px-2 py-1 text-[11px] disabled:opacity-40"
+                        className="display ml-1 cursor-pointer rounded-[var(--radius)] border px-2 py-1 text-[12px] disabled:opacity-40"
                         style={
                           status === s
                             ? {

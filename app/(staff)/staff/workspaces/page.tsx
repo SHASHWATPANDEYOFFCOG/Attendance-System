@@ -196,7 +196,7 @@ function WorkspaceForm({ ws, staff, isAdministrator, onDone, onCancel }: {
           <fieldset className="m-0 border-0 p-0">
             <legend className="label mb-1.5">Authorities in this workspace</legend>
             {staff.length ? (
-              <div className="grid max-h-[260px] gap-1.5 overflow-y-auto rounded-[3px] border border-rule p-2.5 sm:grid-cols-2">
+              <div className="grid max-h-[260px] gap-1.5 overflow-y-auto rounded-[var(--radius)] border border-rule p-2.5 sm:grid-cols-2">
                 {staff.map((s) => (
                   <Checkbox key={s.id} checked={f.member_ids.includes(s.id)} onChange={() => toggleMember(s.id)}
                             label={<>{s.full_name} <span className="text-[12px] text-ash">{ROLE_LABEL[s.role] ?? s.role}{s.department ? ` · ${s.department}` : ""}</span></>} />

@@ -178,7 +178,7 @@ export function GuidedCapture({
 
   if (failure) {
     return (
-      <div className="rounded-[3px] border-l-4 px-3.5 py-3" style={{ borderLeftColor: "var(--oxide)", background: "color-mix(in srgb, var(--oxide) 10%, transparent)" }}>
+      <div className="rounded-[var(--radius)] border-l-4 px-3.5 py-3" style={{ borderLeftColor: "var(--oxide)", background: "color-mix(in srgb, var(--oxide) 10%, transparent)" }}>
         <CameraHelp reason={failure} />
         <Button className="mt-3" onClick={start}>Try again</Button>
       </div>

@@ -59,7 +59,7 @@ export default function ImportPage() {
       <PageHeader
         title="Import students"
         subtitle="CSV or Excel (.xlsx), up to 2000 rows"
-        actions={<Link href="/staff/students" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Back to students</Link>}
+        actions={<Link href="/staff/students" className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink no-underline hover:bg-tint">Back to students</Link>}
       />
       <Card className="mb-4">
         <CardHeader title="1. Get the template" />
@@ -76,7 +76,7 @@ export default function ImportPage() {
         <CardHeader title="2. Check and import" />
         <FormError>{error}</FormError>
         <div className="grid gap-3">
-          <label className="display inline-flex w-fit cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint">
+          <label className="display inline-flex w-fit cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint">
             {file ? `File: ${file.name}` : "Choose file"}
             <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only"
                    onChange={(e) => { setFile(e.target.files?.[0] ?? null); setResult(null); }} />
@@ -112,7 +112,7 @@ export default function ImportPage() {
                   <thead>
                     <tr>
                       {["Row", "Field", "Value", "Problem"].map((h) => (
-                        <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
+                        <th key={h} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">{h}</th>
                       ))}
                     </tr>
                   </thead>

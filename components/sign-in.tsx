@@ -3,6 +3,9 @@
 import { Suspense, useState } from "react";
 
 import Link from "next/link";
+
+import { inputClass } from "@/components/forms";
+import { BrandHeader, PublicTopBar } from "@/components/public-shell";
 import { useRouter, useSearchParams } from "next/navigation";
 
 /**
@@ -81,12 +84,12 @@ function LoginForm({ portal }: { portal: Portal }) {
     <LoginShell portal={portal}>
       <form
           onSubmit={submit}
-          className="bg-card border border-rule rounded-[3px] p-6 shadow-lift"
+          className="glass rounded-[var(--radius-xl)] border border-rule p-6 shadow-lift sm:p-7"
         >
           {registered && !error ? (
             <div
               role="status"
-              className="mb-3 rounded-r-[2px] border-l-4 px-3 py-2 text-[13.5px]"
+              className="mb-3 rounded-[var(--radius-sm)] border-l-4 px-3 py-2 text-[13.5px]"
               style={{ borderLeftColor: "var(--verdant)", background: "color-mix(in srgb, var(--verdant) 11%, transparent)" }}
             >
               {registered}
@@ -95,7 +98,7 @@ function LoginForm({ portal }: { portal: Portal }) {
           {error ? (
             <div
               role="alert"
-              className="mb-3 rounded-r-[2px] border-l-4 px-3 py-2 text-[13.5px]"
+              className="mb-3 rounded-[var(--radius-sm)] border-l-4 px-3 py-2 text-[13.5px]"
               style={{
                 borderLeftColor: "var(--oxide)",
                 background: "color-mix(in srgb, var(--oxide) 11%, transparent)",
@@ -125,7 +128,7 @@ function LoginForm({ portal }: { portal: Portal }) {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-[3px] border border-rule bg-card px-3 py-2.5 text-[14px] text-ink"
+              className={`${inputClass} border-rule focus:border-accent`}
             />
           </div>
 
@@ -141,15 +144,15 @@ function LoginForm({ portal }: { portal: Portal }) {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-[3px] border border-rule bg-card px-3 py-2.5 text-[14px] text-ink"
+              className={`${inputClass} border-rule focus:border-accent`}
             />
           </div>
 
           <button
             type="submit"
             disabled={busy}
-            className="display w-full cursor-pointer rounded-[3px] border px-4 py-2.5 text-[12px] disabled:opacity-50"
-            style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}
+            className="display w-full cursor-pointer rounded-[var(--radius)] border px-4 py-2.5 text-[13px] disabled:opacity-50"
+            style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}
           >
             {busy ? "Signing in..." : "Sign in"}
           </button>
@@ -182,31 +185,12 @@ function LoginForm({ portal }: { portal: Portal }) {
 /** The static page shell. Also the Suspense fallback, so the layout never jumps. */
 function LoginShell({ portal, children }: { portal: Portal; children?: React.ReactNode }) {
   return (
-    <main className="relative z-[1] grid min-h-screen place-items-center px-4">
-      <div className="w-full max-w-[420px]">
-        <header className="mb-6 text-center">
-          <h1
-            className="display m-0 text-[30px]"
-            style={{
-              background: "linear-gradient(100deg, var(--ink) 30%, var(--oxide))",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            Attendance Register
-          </h1>
-          <div
-            className="mx-auto mt-2.5 h-[2px]"
-            style={{
-              background: "linear-gradient(90deg, var(--ink), var(--oxide) 55%, transparent)",
-            }}
-          />
-          <p className="mt-2 font-mono text-xs text-ash">{COPY[portal].subtitle}</p>
-        </header>
+    <main className="relative z-[1] grid min-h-screen place-items-center px-4 pb-10 pt-16">
+      <PublicTopBar />
+      <div className="animate-page-in w-full max-w-[440px]">
+        <BrandHeader subtitle={COPY[portal].subtitle} />
         {children}
       </div>
     </main>
   );
 }
-

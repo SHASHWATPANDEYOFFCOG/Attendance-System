@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 import { ADMIN } from "./config.mjs";
 import { adminApi, approvedStudent, expectNoHorizontalScroll, makeClass, signIn, uid } from "./helpers";
 
-const PUBLIC = ["/login", "/signup", "/forgot-password", "/privacy", "/guide"];
+const PUBLIC = ["/", "/login", "/signup", "/forgot-password", "/privacy", "/guide"];
 const STAFF = ["/dashboard", "/staff/sessions", "/mark", "/staff/reports", "/staff/students", "/staff/approvals",
   "/staff/leaves", "/staff/issues", "/staff/messages", "/staff/setup", "/staff/cameras", "/staff/admin/settings",
   "/staff/workspaces", "/staff/tablets", "/staff/admin/access", "/staff/setup?tab=years"];
@@ -72,4 +72,21 @@ test("student pages, and staff pages stay closed to students", async ({ page }) 
   const r = await page.request.get("/api/backend/api/students");
   expect(r.status()).toBe(403);
   await admin.dispose();
+});
+
+
+test("the command palette opens with Ctrl+K, filters, and navigates by keyboard", async ({ page }) => {
+  await signIn(page, ADMIN.username, ADMIN.password, "authority");
+  await page.goto("/dashboard");
+  await page.waitForLoadState("networkidle");
+  await page.keyboard.press("Control+k");
+  const box = page.getByRole("combobox", { name: "Search pages and actions" });
+  await expect(box).toBeFocused();
+  await box.fill("work");
+  await expect(page.getByRole("option").first()).toContainText("Workspaces");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/staff\/workspaces/);
+  await page.keyboard.press("Control+k");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
 });

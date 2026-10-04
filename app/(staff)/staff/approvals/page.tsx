@@ -71,8 +71,8 @@ function Approvals() {
             key={key}
             href={`/staff/approvals?tab=${key}`}
             aria-current={tab === key ? "page" : undefined}
-            className="display rounded-[3px] border px-3 py-1.5 text-[11.5px] no-underline"
-            style={tab === key ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)" }}
+            className="display rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px] no-underline"
+            style={tab === key ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" } : { borderColor: "var(--rule)", color: "var(--ink)" }}
           >
             {label}
             {count[key] ? ` (${count[key]})` : ""}

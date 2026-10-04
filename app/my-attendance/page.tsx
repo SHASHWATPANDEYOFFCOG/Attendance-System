@@ -32,7 +32,7 @@ export default async function MyAttendance() {
 
   return (
     <main className="relative z-[1] mx-auto max-w-[1100px] px-4 pb-16 pt-6 md:px-5">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-3">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] pb-3">
         <div>
           <h1 className="display m-0 text-[26px]">My attendance</h1>
           <p className="mt-0.5 font-mono text-xs text-ash">

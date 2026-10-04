@@ -119,7 +119,7 @@ export default function CamerasPage() {
                   actions={isAdministrator && !editing ? <Button variant="primary" onClick={() => setEditing("new")}>+ Add camera</Button> : null} />
 
       {isAdministrator ? (
-        <details className="mb-4 rounded-[3px] border border-rule bg-card shadow-card" open={rows?.length === 0}>
+        <details className="mb-4 rounded-[var(--radius)] border border-rule bg-card shadow-card" open={rows?.length === 0}>
           <summary className="cursor-pointer px-4 py-3"><span className="label text-[12px]">How to add a camera</span></summary>
           <ol className="m-0 grid list-decimal gap-1.5 border-t border-rule py-3 pl-9 pr-4 text-[13.5px]">
             <li>Create a <Link href="/staff/workspaces" className="text-ink underline">workspace</Link> (e.g. &quot;CSE Block&quot;) and add the authorities who should use its cameras.</li>
@@ -182,7 +182,7 @@ export default function CamerasPage() {
                   t.ok ? (
                     <figure className="m-0 mt-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={t.preview} alt={`Live frame from ${c.name}`} className="w-full rounded-[3px] border border-rule" />
+                      <img src={t.preview} alt={`Live frame from ${c.name}`} className="w-full rounded-[var(--radius)] border border-rule" />
                       <figcaption className="font-mono text-[11.5px] text-ash">connected in {t.ms} ms · {t.width}×{t.height} · not stored</figcaption>
                     </figure>
                   ) : <div className="mt-3"><Banner bad>{t.error}</Banner></div>

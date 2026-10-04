@@ -74,13 +74,13 @@ export function UiProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role={t.tone === "bad" ? "alert" : "status"}
-            className="animate-row-in pointer-events-auto w-full max-w-[380px] rounded-[3px] border-l-4 bg-card px-3.5 py-2.5 text-[13.5px] shadow-lift"
-            style={{
-              borderLeftColor:
-                t.tone === "bad" ? "var(--oxide)" : t.tone === "info" ? "var(--ink)" : "var(--verdant)",
-            }}
+            className="glass animate-pop-in pointer-events-auto flex w-full max-w-[400px] items-start gap-2.5 rounded-[var(--radius-lg)] border border-rule px-4 py-3 text-[13.5px] shadow-lift"
           >
-            {t.text}
+            <span aria-hidden className="mt-[3px] grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white"
+                  style={{ background: t.tone === "bad" ? "var(--oxide)" : t.tone === "info" ? "var(--accent)" : "var(--verdant)" }}>
+              {t.tone === "bad" ? "!" : t.tone === "info" ? "i" : "\u2713"}
+            </span>
+            <span className="min-w-0 flex-1">{t.text}</span>
           </div>
         ))}
       </div>
@@ -117,15 +117,15 @@ function ConfirmDialog({ pending, close }: { pending: Pending; close: () => void
   }, [finish]);
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/45 px-4" role="presentation">
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 px-4 backdrop-blur-[3px]" role="presentation">
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className="w-full max-w-[440px] rounded-[3px] border border-rule bg-card p-5 shadow-lift"
+        className="glass animate-pop-in w-full max-w-[460px] rounded-[var(--radius-xl)] border border-rule p-6 shadow-lift"
       >
-        <h2 id="confirm-title" className="display m-0 mb-2 text-[17px]">
+        <h2 id="confirm-title" className="display m-0 mb-2 text-[19px]">
           {pending.title}
         </h2>
         {pending.body ? <div className="mb-3 text-[14px] text-ink/85">{pending.body}</div> : null}
@@ -139,7 +139,7 @@ function ConfirmDialog({ pending, close }: { pending: Pending; close: () => void
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={pending.reason.placeholder}
-              className="min-h-[84px] w-full rounded-[3px] border border-rule bg-card px-3 py-2 text-[14px] text-ink"
+              className="min-h-[90px] w-full rounded-[var(--radius)] border border-rule bg-card px-3.5 py-2.5 text-[14.5px] text-ink focus:border-accent"
             />
             {tooShort && reason ? (
               <p className="mt-1 text-[12.5px] text-oxide">Write at least {min} characters.</p>
@@ -150,7 +150,7 @@ function ConfirmDialog({ pending, close }: { pending: Pending; close: () => void
           <button
             type="button"
             onClick={() => finish(false)}
-            className="display cursor-pointer rounded-[3px] border border-ink bg-transparent px-3.5 py-2 text-[12px] text-ink"
+            className="btn display min-h-[40px] cursor-pointer rounded-[var(--radius)] border border-rule bg-transparent px-4 py-2 text-[13.5px] text-ink hover:bg-tint"
           >
             Cancel
           </button>
@@ -158,11 +158,12 @@ function ConfirmDialog({ pending, close }: { pending: Pending; close: () => void
             type="button"
             disabled={tooShort}
             onClick={() => finish(true)}
-            className="display cursor-pointer rounded-[3px] border px-3.5 py-2 text-[12px] disabled:opacity-50"
+            className={`btn display min-h-[40px] cursor-pointer rounded-[var(--radius)] border px-4 py-2 text-[13.5px] disabled:cursor-not-allowed disabled:opacity-50 ${pending.danger ? "" : "btn-primary"}`}
             style={{
-              background: pending.danger ? "var(--oxide)" : "var(--ink)",
-              borderColor: pending.danger ? "var(--oxide)" : "var(--ink)",
-              color: "var(--card)",
+              backgroundImage: pending.danger ? undefined : "var(--grad-primary)",
+              background: pending.danger ? "var(--oxide)" : undefined,
+              borderColor: "transparent",
+              color: "#fff",
             }}
           >
             {pending.confirmLabel ?? "Confirm"}

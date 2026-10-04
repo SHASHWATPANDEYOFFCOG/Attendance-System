@@ -131,8 +131,8 @@ export function ApprovalManagement({ onChange }: { onChange: () => void }) {
       <nav aria-label="Status" className="flex flex-wrap gap-1">
         {STATUSES.map(([s, label]) => (
           <button key={s} type="button" onClick={() => setStatus(s)} aria-pressed={status === s}
-                  className="display cursor-pointer rounded-[3px] border px-3 py-1.5 text-[11.5px]"
-                  style={status === s ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
+                  className="display cursor-pointer rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px]"
+                  style={status === s ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
             {label}{counts[s] != null ? ` (${counts[s]})` : ""}
           </button>
         ))}
@@ -165,7 +165,7 @@ export function ApprovalManagement({ onChange }: { onChange: () => void }) {
       </Card>
 
       {selected.size ? (
-        <div className="sticky top-[60px] z-10 flex flex-wrap items-center gap-2 rounded-[3px] border border-rule bg-card p-2.5 shadow-lift">
+        <div className="sticky top-[60px] z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-rule bg-card p-2.5 shadow-lift">
           <span className="text-[13px]"><strong>{selected.size}</strong> selected</span>
           {ACTIONS_FOR[status].map((a) => (
             <Button key={a} variant={a === "approve" || a === "restore" ? "primary" : "secondary"} busy={busy}
@@ -185,7 +185,7 @@ export function ApprovalManagement({ onChange }: { onChange: () => void }) {
           {/* Phones: one card per student, actions in reach of a thumb. */}
           <ul className="m-0 grid list-none gap-2 p-0 md:hidden">
             {rows.map((r) => (
-              <li key={r.id} className="rounded-[3px] border border-rule p-3">
+              <li key={r.id} className="rounded-[var(--radius)] border border-rule p-3">
                 <div className="flex items-start gap-2.5">
                   <Checkbox aria-label={`Select ${r.full_name}`} label="" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
                   <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-rule bg-paper">
@@ -215,12 +215,12 @@ export function ApprovalManagement({ onChange }: { onChange: () => void }) {
             <table className="w-full min-w-[860px] border-collapse text-[13.5px]">
               <thead>
                 <tr>
-                  <th className="border-b-2 border-ink px-2 pb-1.5 text-left">
+                  <th className="border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">
                     <input type="checkbox" aria-label="Select all" className="h-4 w-4" checked={allTicked}
                            onChange={() => setSelected(allTicked ? new Set() : new Set(rows.map((r) => r.id)))} />
                   </th>
                   {["Student", "Roll no.", "Class / year", "Branch", "Section", "Academic year", "Status", ""].map((h) => (
-                    <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
+                    <th key={h} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">{h}</th>
                   ))}
                 </tr>
               </thead>

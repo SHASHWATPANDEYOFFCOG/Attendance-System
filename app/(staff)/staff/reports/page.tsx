@@ -109,14 +109,14 @@ function Reports() {
   return (
     <Page wide>
       <PageHeader title="Reports" subtitle={data?.title ?? ""}
-                  actions={<Link href="/reports" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Record-level report</Link>} />
+                  actions={<Link href="/reports" className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink no-underline hover:bg-tint">Record-level report</Link>} />
       <nav aria-label="Report type" className="-mx-1 mb-4 overflow-x-auto pb-1">
         <ul className="m-0 flex min-w-max list-none gap-1 p-0 px-1">
           {KINDS.map(([k, l]) => (
             <li key={k}>
               <button type="button" onClick={() => set("kind", k)} aria-current={kind === k ? "page" : undefined}
-                      className="display cursor-pointer rounded-[3px] border px-3 py-1.5 text-[11.5px]"
-                      style={kind === k ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
+                      className="display cursor-pointer rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px]"
+                      style={kind === k ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
                 {l}
               </button>
             </li>
@@ -174,7 +174,7 @@ function Reports() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] border-collapse text-[13.5px]">
                 <thead>
-                  <tr>{data.columns.map((c) => <th key={c.key} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{c.label}</th>)}</tr>
+                  <tr>{data.columns.map((c) => <th key={c.key} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">{c.label}</th>)}</tr>
                 </thead>
                 <tbody>
                   {data.rows.map((r, i) => (

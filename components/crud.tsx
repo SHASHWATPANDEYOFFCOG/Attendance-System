@@ -202,7 +202,7 @@ export function CrudTable<T extends { id: number }>({
         <form
           onSubmit={submit}
           noValidate
-          className="mb-4 rounded-[3px] border border-rule bg-paper p-3.5"
+          className="mb-4 rounded-[var(--radius)] border border-rule bg-paper p-3.5"
           aria-label={editing === "new" ? `Add ${title}` : `Edit ${title}`}
         >
           <FormError>{formError}</FormError>
@@ -283,11 +283,11 @@ export function CrudTable<T extends { id: number }>({
             <thead>
               <tr>
                 {columns.map((c) => (
-                  <th key={c.key} className="label border-b-2 border-ink px-2 pb-1.5 text-left">
+                  <th key={c.key} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">
                     {c.label}
                   </th>
                 ))}
-                <th className="relative label border-b-2 border-ink px-2 pb-1.5 text-right">
+                <th className="relative label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-right">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>

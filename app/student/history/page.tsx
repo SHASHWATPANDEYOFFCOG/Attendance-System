@@ -123,7 +123,7 @@ function History() {
         {data.totals ? (
           <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Totals for the lectures shown">
             {SUMMARY.filter(([k]) => k === "present" || k === "late" || k === "absent" || (data.totals?.[k] ?? 0) > 0).map(([k, label, col]) => (
-              <div key={k} className="rounded-[3px] border border-rule bg-card py-2 text-center shadow-card">
+              <div key={k} className="rounded-[var(--radius)] border border-rule bg-card py-2 text-center shadow-card">
                 <div className="label text-[10.5px]">{label}</div>
                 <div className="font-mono text-[22px] font-semibold tnum" style={{ color: col }}>{data.totals?.[k] ?? 0}</div>
               </div>
@@ -153,7 +153,7 @@ function History() {
               <thead>
                 <tr>
                   {["Date", "Time", "Subject", "Status", "Marked by", "Note"].map((h) => (
-                    <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
+                    <th key={h} className="label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 text-left">{h}</th>
                   ))}
                 </tr>
               </thead>

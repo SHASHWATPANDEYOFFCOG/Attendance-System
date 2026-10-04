@@ -109,7 +109,7 @@ export function TrendChart({ trend }: { trend: Trend }) {
         onClick={() => setShowTable((v) => !v)}
         aria-expanded={showTable}
         aria-controls={tableId}
-        className="display mt-1 text-[11px] text-ash underline underline-offset-2 hover:text-ink"
+        className="display mt-1 text-[12px] text-ash underline underline-offset-2 hover:text-ink"
       >
         {showTable ? "Hide" : "Show"} data table
       </button>
@@ -177,7 +177,7 @@ export function WeekdayHeatmap({ weekday }: { weekday: Weekday }) {
             <div key={r.weekday} className="flex-1">
               <div
                 title={`${r.label}: ${r.absence_pct}% absent (${r.counted - r.present} of ${r.counted})`}
-                className="flex h-16 items-center justify-center rounded-[3px] border border-rule font-mono text-[13px] font-semibold tnum"
+                className="flex h-16 items-center justify-center rounded-[var(--radius)] border border-rule font-mono text-[13px] font-semibold tnum"
                 style={{ background: SEQ[step], color: onDark ? "var(--card)" : "var(--ink)" }}
               >
                 {r.absence_pct}%

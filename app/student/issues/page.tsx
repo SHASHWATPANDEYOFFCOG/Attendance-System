@@ -110,7 +110,7 @@ function NewIssue({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
         <TextArea label="Description" required value={f.description} error={errors.description}
                   onChange={(e) => setF((x) => ({ ...x, description: e.target.value }))}
                   hint="For an attendance correction, say which lecture and date." />
-        <label className="display inline-flex w-fit cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint">
+        <label className="display inline-flex w-fit cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint">
           {file ? `Attached: ${file.name}` : "Attach file (optional)"}
           <input type="file" accept="application/pdf,image/jpeg,image/png" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>

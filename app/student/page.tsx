@@ -78,8 +78,8 @@ export default async function StudentHome() {
           markable.length ? (
             <Link
               href="/student/mark"
-              className="display inline-flex items-center gap-2 rounded-[3px] border px-4 py-2.5 text-[12px] no-underline"
-              style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}
+              className="display inline-flex items-center gap-2 rounded-[var(--radius)] border px-4 py-2.5 text-[13px] no-underline"
+              style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}
             >
               <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "var(--verdant)" }} aria-hidden />
               Mark attendance — {markable[0].subject_code ?? "now"}

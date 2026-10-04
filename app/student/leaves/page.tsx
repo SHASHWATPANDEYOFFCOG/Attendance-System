@@ -82,7 +82,7 @@ export default function LeavesPage() {
                 <Pill tone={l.status === "approved" ? "ok" : l.status === "rejected" ? "bad" : l.status === "cancelled" ? "neutral" : "warn"}>{l.status}</Pill>
               </div>
               {l.remark || l.decided_by ? (
-                <p className="mb-0 mt-2 rounded-[3px] bg-tint px-2.5 py-1.5 text-[13px]">
+                <p className="mb-0 mt-2 rounded-[var(--radius)] bg-tint px-2.5 py-1.5 text-[13px]">
                   <strong>{l.decided_by ?? "Teacher"}:</strong> {l.remark ?? "No remark."}
                 </p>
               ) : null}
@@ -175,7 +175,7 @@ function LeaveForm({ leave, onDone, onCancel }: { leave: Leave | null; onDone: (
         </div>
         <Checkbox label="Only specific lectures in these dates" checked={specific} onChange={(e) => setSpecific(e.target.checked)} />
         {specific ? (
-          <fieldset className="m-0 rounded-[3px] border border-rule p-3">
+          <fieldset className="m-0 rounded-[var(--radius)] border border-rule p-3">
             <legend className="label px-1">Lectures</legend>
             {lectures === null ? <p className="m-0 text-[13px] text-ash">Loading lectures…</p> : !lectures.length ? (
               <p className="m-0 text-[13px] text-ash">No lectures recorded or scheduled in these dates yet. Apply for the whole days instead.</p>
@@ -196,7 +196,7 @@ function LeaveForm({ leave, onDone, onCancel }: { leave: Leave | null; onDone: (
         <TextArea label="Detailed explanation" value={f.explanation} onChange={set("explanation")} error={errors.explanation}
                   hint="Anything your teacher should know about the absence." />
         <div>
-          <label className="display inline-flex w-fit cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint">
+          <label className="display inline-flex w-fit cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint">
             {file ? `Attached: ${file.name}` : "Attach certificate (PDF / JPG / PNG, max 5 MB)"}
             <input type="file" accept="application/pdf,image/jpeg,image/png" className="sr-only"
                    onChange={(e) => { setFile(e.target.files?.[0] ?? null); setErrors(({ attachment: _a, ...r }) => r); }} />

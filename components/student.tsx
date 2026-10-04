@@ -211,13 +211,13 @@ export function SubjectBars({ subjects, threshold }: { subjects: Subject[]; thre
             </div>
 
             <div
-              className="relative mt-1.5 h-2.5 w-full overflow-hidden rounded-[2px]"
+              className="relative mt-1.5 h-2.5 w-full overflow-hidden rounded-[var(--radius-sm)]"
               style={{ background: "var(--tint-hard)" }}
               role="img"
               aria-label={`${s.code}: ${pct} percent, minimum ${threshold} percent`}
             >
               <div
-                className="h-full rounded-[2px]"
+                className="h-full rounded-[var(--radius-sm)]"
                 style={{
                   width: `${Math.max(0, Math.min(100, pct))}%`,
                   background: below ? "var(--status-absent)" : "var(--status-present)",
@@ -306,7 +306,7 @@ export function AttendanceCalendar({
                         ? `${iso}: ${entry.status}, ${entry.periods} period(s)`
                         : undefined
                     }
-                    className="flex aspect-square flex-col items-center justify-center rounded-[2px] border leading-none"
+                    className="flex aspect-square flex-col items-center justify-center rounded-[var(--radius-sm)] border leading-none"
                     style={{
                       borderColor: entry ? STATUS_COLOR[entry.status] : "var(--rule)",
                       color: entry ? STATUS_COLOR[entry.status] : "var(--ash)",

@@ -74,8 +74,8 @@ function VerifyForm() {
         <Banner>{notice}</Banner>
         <Link
           href={signInAt}
-          className="display mt-2 inline-flex rounded-[3px] border px-4 py-2.5 text-[12px] no-underline"
-          style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}
+          className="display mt-2 inline-flex rounded-[var(--radius)] border px-4 py-2.5 text-[13px] no-underline"
+          style={{ background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" }}
         >
           Sign in
         </Link>

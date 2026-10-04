@@ -61,8 +61,8 @@ function Settings() {
           {tabs.map(([k, label]) => (
             <li key={k}>
               <button type="button" onClick={() => router.replace(`/staff/admin/settings?tab=${k}`)} aria-current={tab === k ? "page" : undefined}
-                      className="display cursor-pointer rounded-[3px] border px-3 py-1.5 text-[11.5px]"
-                      style={tab === k ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
+                      className="display cursor-pointer rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px]"
+                      style={tab === k ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
                 {label}
               </button>
             </li>
@@ -437,7 +437,7 @@ function CollegeTab({ canEdit }: { canEdit: boolean }) {
             </Card>
           );
         })}
-        <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-[3px] border border-rule bg-card p-3 shadow-lift">
+        <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-rule bg-card p-3 shadow-lift">
           <Button type="submit" variant="primary" busy={busy} disabled={!Object.keys(dirty).length}>Save changes</Button>
           {Object.keys(dirty).length ? <Button onClick={() => load()}>Discard</Button> : null}
           <span className="text-[13px] text-ash">{Object.keys(dirty).length ? `${Object.keys(dirty).length} unsaved change(s)` : "All changes saved"}</span>

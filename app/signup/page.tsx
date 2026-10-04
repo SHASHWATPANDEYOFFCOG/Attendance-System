@@ -347,7 +347,7 @@ export default function SignupPage() {
               </p>
               <div className="flex flex-wrap items-center gap-4">
                 <div
-                  className="grid h-[112px] w-[112px] shrink-0 place-items-center overflow-hidden rounded-[3px] border border-rule bg-paper"
+                  className="grid h-[112px] w-[112px] shrink-0 place-items-center overflow-hidden rounded-[var(--radius)] border border-rule bg-paper"
                   aria-hidden={!preview}
                 >
                   {preview ? (
@@ -358,7 +358,7 @@ export default function SignupPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <label className="display inline-flex cursor-pointer rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink hover:bg-tint">
+                  <label className="display inline-flex cursor-pointer rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink hover:bg-tint">
                     {photo ? "Change photo" : "Choose photo"}
                     <input
                       type="file"

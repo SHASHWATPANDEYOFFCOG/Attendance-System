@@ -99,7 +99,7 @@ function Students() {
         subtitle={data ? `${data.meta.total} student(s) in your classes` : "loading"}
         actions={
           <>
-            <Link href="/staff/students/import" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">
+            <Link href="/staff/students/import" className="display rounded-[var(--radius)] border border-ink px-3.5 py-2 text-[13px] text-ink no-underline hover:bg-tint">
               Import CSV / Excel
             </Link>
             <Button variant="primary" onClick={() => setAdding((a) => !a)}>
@@ -161,7 +161,7 @@ function Students() {
               <thead>
                 <tr>
                   {["Student", "Roll no", "Class", "Status", "Face", "Attendance"].map((h) => (
-                    <th key={h} className={`label border-b-2 border-ink px-2 pb-1.5 ${h === "Attendance" ? "text-right" : "text-left"}`}>{h}</th>
+                    <th key={h} className={`label border-b border-[color-mix(in_srgb,var(--ink)_20%,transparent)] px-2 pb-1.5 ${h === "Attendance" ? "text-right" : "text-left"}`}>{h}</th>
                   ))}
                 </tr>
               </thead>

@@ -97,8 +97,8 @@ function SessionCard({ s, data, onDone }: { s: ActiveSession; data: Payload; onD
           <div role="tablist" aria-label="How to mark" className="mb-3 flex gap-1">
             {(["selfie", "code"] as const).map((m) => (
               <button key={m} role="tab" type="button" aria-selected={mode === m} onClick={() => setMode(m)}
-                      className="display cursor-pointer rounded-[3px] border px-3 py-1.5 text-[11.5px]"
-                      style={mode === m ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
+                      className="display cursor-pointer rounded-[var(--radius)] border px-3 py-1.5 text-[12.5px]"
+                      style={mode === m ? { background: "var(--grad-primary)", borderColor: "transparent", color: "var(--on-accent)" } : { borderColor: "var(--rule)", color: "var(--ink)", background: "transparent" }}>
                 {m === "selfie" ? "Face check" : "Classroom code / QR"}
               </button>
             ))}

@@ -37,7 +37,7 @@ export function Thread({ items }: { items: ThreadItem[] }) {
       {items.map((m) => (
         <li key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
           <div
-            className="max-w-[85%] rounded-[3px] border px-3 py-2"
+            className="max-w-[85%] rounded-[var(--radius)] border px-3 py-2"
             style={m.mine
               ? { background: "color-mix(in srgb, var(--ink) 8%, var(--card))", borderColor: "var(--rule)" }
               : { background: "var(--card)", borderColor: "var(--rule)" }}
@@ -107,7 +107,7 @@ export function Composer({
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(e as unknown as React.FormEvent);
         }}
         placeholder={placeholder}
-        className="min-h-[80px] w-full rounded-[3px] border border-rule bg-card px-3 py-2 text-[14px] text-ink"
+        className="min-h-[80px] w-full rounded-[var(--radius)] border border-rule bg-card px-3 py-2 text-[14px] text-ink"
       />
       {error ? <p role="alert" className="m-0 text-[12.5px] text-oxide">{error}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-2">

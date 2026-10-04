@@ -79,10 +79,27 @@ email code and/or administrator approval under Settings.)
 6. **Reports.** Daily, monthly, subject-wise, student-wise and defaulter reports for any date
    range, each downloadable as CSV, Excel or PDF.
 
-## Administrators and HODs
+## Approval management (all authorities)
 
-Everything teachers can do, for your department (HOD) or the whole college (super admin), plus
-**Academic setup**, **Staff & roles** and **CCTV cameras**. Only the super admin can change
-**Settings** (teachers can read them) and open the **Audit log**, which records every
-attendance change, approval and permission change with who did it and when.
+**Approvals → Students** lists students by status — **Pending, Approved, Rejected, Revoked** —
+and filters by academic year, branch, batch, year and section. Approve, reject (with a reason),
+revoke (the student keeps their record but cannot mark attendance) or restore, one at a time or
+by ticking several. Every decision is recorded in the audit log with the old and new status.
+
+## Tablets (all authorities)
+
+1. **Tablets → Register a tablet**: name, workspace, and the cameras it may use. A one-time
+   8-character pairing code appears (valid 15 minutes).
+2. On the tablet: open the site, sign in at **/authority/login**, go to **Tablets**, and enter the
+   code under **This device**.
+3. The tablet can now take **Tablet photo** attendance and control its cameras on a live
+   lecture. **Disable** it temporarily, **Re-pair** to replace the device, or **Revoke** a lost one.
+
+## Administrators
+
+Administrators control everything: **Academic setup** (academic years, branches, batches,
+sections — each can be deactivated), **Workspaces**, **CCTV cameras**, **Staff & roles**,
+**Settings** (including **Access codes**) and the **Audit log**. An authority becomes an
+administrator by entering the administrator code under **Administration → Administrator
+access**. HODs manage the academic data of their own branch.
 Installation and configuration: see [DEPLOY.md](DEPLOY.md).

@@ -71,6 +71,12 @@ python tools\seed.py --admin principal --password "<a strong password>"
 
 Sign in at `https://<your address>/authority/login` (staff; students use `/login`), then in order:
 
+0. **Settings → Access codes** — change both access codes *first*. Until you do, the documented
+   defaults work for anyone who has read this guide:
+   - **authority code** (default `occlubio-authority`): needed to register at `/authority/register`;
+   - **administrator code** (default `occlubio-administrator`): lets a signed-in authority become an
+     administrator under **Administration → Administrator access**.
+   Codes are stored only as argon2 hashes and never shown; the old code stops working on save.
 1. **Settings** — college name, minimum attendance %, present/late windows, campus location.
 2. **Academic setup** — branches, batches, class groups (sections), subjects, rooms, term,
    timetable, holidays.
@@ -78,7 +84,12 @@ Sign in at `https://<your address>/authority/login` (staff; students use `/login
    let them register at `/authority/register` and approve them under **Approvals → Staff**.
 4. **Students** — import a spreadsheet (**Directory → Import CSV / Excel**), add them one by one, or let them
    self-register at `/signup` and approve them under **Approvals**.
-5. **CCTV cameras** — optional, see below.
+5. **Workspaces** — create one per area (e.g. "CSE Block") and add the authorities who work there.
+6. **CCTV cameras** — optional, see below; give each camera a workspace.
+7. **Tablets** — each authority registers the tablets they use in class and pairs them with the
+   one-time code (see the in-app guide, Tablet section). With the setting "Tablet photo and camera
+   control only from registered tablets" on (default), class-photo attendance and camera control
+   work only from a paired tablet of the teacher's workspace; administrators are exempt.
 
 ## 4. Run
 
@@ -142,6 +153,9 @@ Server-Sent Events).
 - **Stream address** — the camera's RTSP URL *without* the username and password.
 - **Username / Password** — the camera's login. Stored encrypted; never shown again.
 - **Start automatically during lectures in this room** — usually on.
+- **Workspace** — only that workspace's authorities (and administrators) can see, test, start
+  or connect the camera. A camera with no workspace is administrator-only.
+- **Camera ID, type, description** — for your own records (the ID is generated if left empty).
 
 Press **Test** — it grabs one frame and reports whether the stream works.
 

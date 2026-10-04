@@ -50,6 +50,8 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
       items: [
         { href: "/staff/setup", label: "Academic setup" },
         { href: "/staff/cameras", label: "CCTV cameras" },
+        { href: "/staff/workspaces", label: "Workspaces" },
+        { href: "/staff/tablets", label: "Tablets" },
       ],
     },
     {
@@ -58,6 +60,7 @@ export function staffNav(role: string, counts: Counts = {}): NavGroup[] {
         ...(admin ? [{ href: "/staff/admin/users", label: "Staff & roles" }] : []),
         { href: "/staff/admin/settings", label: "Settings" },
         ...(role === "super_admin" ? [{ href: "/staff/admin/audit", label: "Audit log" }] : []),
+        ...(role !== "super_admin" ? [{ href: "/staff/admin/access", label: "Administrator access" }] : []),
       ],
     },
     HELP,

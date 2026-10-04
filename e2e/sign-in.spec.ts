@@ -55,6 +55,7 @@ test("by default a registered teacher signs in straight away", async ({ page }) 
   await page.goto("/authority/register");
   await page.waitForLoadState("networkidle");
   await expect(page.getByText(/Your account is ready as soon as you register/)).toBeVisible();
+  await page.getByLabel(/^Authority access code/).fill("occlubio-authority");
   await page.getByLabel(/^Full name/).fill(`Quick ${tag}`);
   await page.getByLabel(/^Email/).fill(email);
   await page.getByLabel(/^Mobile number/).fill(`6${String(parseInt(tag, 36)).padStart(9, "0").slice(-9)}`);
@@ -84,6 +85,7 @@ test("with approval switched on, a registered teacher waits until an admin appro
   await page.getByRole("link", { name: "New staff member? Register" }).click();
   await expect(page).toHaveURL(/\/authority\/register/);
   await page.waitForLoadState("networkidle");
+  await page.getByLabel(/^Authority access code/).fill("occlubio-authority");
   await page.getByLabel(/^Full name/).fill(name);
   await page.getByLabel(/^Email/).fill(email);
   await page.getByLabel(/^Mobile number/).fill(`7${String(parseInt(tag, 36)).padStart(9, "0").slice(-9)}`);

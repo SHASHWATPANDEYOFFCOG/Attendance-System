@@ -13,12 +13,16 @@ import { api } from "@/lib/client";
 import { CrudTable, type Option } from "@/components/crud";
 import { Pill } from "@/components/ui";
 
-type Dept = { id: number; code: string; name: string; students: number };
-type Batch = { id: number; label: string; start_year: number; end_year: number; students: number };
+type Dept = { id: number; code: string; name: string; students: number; is_active: boolean };
+type Batch = { id: number; label: string; start_year: number; end_year: number; students: number; is_active: boolean };
 type Section = {
   id: number; name: string; year: number; semester: number; department_id: number;
   department_code: string; batch_id: number | null; batch: string | null; label: string; students: number;
+  academic_year_id: number | null; academic_year: string | null; is_active: boolean;
 };
+type Year = { id: number; label: string; start_date: string; end_date: string; is_active: boolean; is_current: boolean; sections: number };
+
+const activePill = (on: boolean) => (on ? <Pill tone="ok">active</Pill> : <Pill tone="neutral">inactive</Pill>);
 type Subject = { id: number; code: string; name: string; department_id: number; department_code: string; year: number | null; semester: number | null; credits: number };
 type Staff = { id: number; full_name: string; role: string; department: string | null };
 type Room = { id: number; name: string; building: string | null; capacity: number | null; latitude: number | null; longitude: number | null; radius_m: number | null };
@@ -50,6 +54,7 @@ export function SetupScreens({
   const [staff, setStaff] = useState<Staff[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
+  const [years, setYears] = useState<Year[]>([]);
 
   const refresh = useCallback(() => {
     api.get<Dept[]>("/api/departments").then(setDepts).catch(() => {});
@@ -59,6 +64,7 @@ export function SetupScreens({
     api.get<Staff[]>("/api/admin/users").then(setStaff).catch(() => {});
     api.get<Room[]>("/api/rooms").then(setRooms).catch(() => {});
     api.get<Term[]>("/api/terms").then(setTerms).catch(() => {});
+    api.get<Year[]>("/api/academic-years").then(setYears).catch(() => {});
   }, []);
   useEffect(refresh, [refresh]);
 
@@ -78,8 +84,38 @@ export function SetupScreens({
   }));
   const roomOpts: Option[] = rooms.map((r) => ({ value: r.name, label: `${r.name}${r.building ? ` · ${r.building}` : ""}` }));
   const termOpts: Option[] = terms.map((t) => ({ value: t.id, label: `${t.name}${t.is_active ? " (active)" : ""}` }));
+  const yearOpts: Option[] = years.map((y) => ({ value: y.id, label: `${y.label}${y.is_current ? " (current)" : ""}${y.is_active ? "" : " (inactive)"}` }));
 
   switch (tab) {
+    case "years":
+      return (
+        <CrudTable<Year>
+          title="Academic years"
+          endpoint="/api/academic-years"
+          canCreate={superAdmin}
+          canEdit={superAdmin}
+          canDelete={superAdmin}
+          deleteLabel={(y) => `academic year ${y.label}`}
+          onChange={refresh}
+          intro="An academic year (e.g. 2026-27) groups the class groups of that year. Mark one as current; class groups are assigned to a year under Sections, and the approval list filters by it."
+          toForm={(y) => ({ label: y.label, start_date: y.start_date, end_date: y.end_date, is_active: String(y.is_active), is_current: String(y.is_current) })}
+          columns={[
+            { key: "label", label: "Academic year", render: (y) => <strong>{y.label}</strong> },
+            { key: "start_date", label: "From", className: "font-mono tnum" },
+            { key: "end_date", label: "To", className: "font-mono tnum" },
+            { key: "sections", label: "Sections", className: "font-mono tnum" },
+            { key: "is_active", label: "Status", render: (y) => <>{activePill(y.is_active)} {y.is_current ? <Pill tone="ok">current</Pill> : null}</> },
+          ]}
+          fields={[
+            { name: "label", label: "Academic year", required: true, placeholder: "2026-27" },
+            { name: "start_date", label: "Starts", type: "date", required: true },
+            { name: "end_date", label: "Ends", type: "date", required: true },
+            { name: "is_current", label: "This is the current academic year", type: "checkbox" },
+            { name: "is_active", label: "Active", type: "checkbox", defaultValue: "true" },
+          ]}
+          empty="Add the academic years, e.g. 2025-26, 2026-27."
+        />
+      );
     case "branches":
       return (
         <CrudTable<Dept>
@@ -94,10 +130,12 @@ export function SetupScreens({
             { key: "code", label: "Code", render: (d) => <strong>{d.code}</strong> },
             { key: "name", label: "Name" },
             { key: "students", label: "Students", className: "font-mono tnum" },
+            { key: "is_active", label: "Status", render: (d) => activePill(d.is_active) },
           ]}
           fields={[
             { name: "code", label: "Code", required: true, placeholder: "CSE" },
             { name: "name", label: "Name", required: true, placeholder: "Computer Science & Engineering" },
+            { name: "is_active", label: "Active (offered to new registrations)", type: "checkbox", defaultValue: "true" },
           ]}
           empty="Add your first branch, e.g. CSE."
         />
@@ -115,10 +153,12 @@ export function SetupScreens({
           columns={[
             { key: "label", label: "Batch", render: (b) => <strong>{b.label}</strong> },
             { key: "students", label: "Students", className: "font-mono tnum" },
+            { key: "is_active", label: "Status", render: (b) => activePill(b.is_active) },
           ]}
           fields={[
             { name: "start_year", label: "Start year", type: "number", required: true, placeholder: "2023" },
             { name: "end_year", label: "End year", type: "number", required: true, placeholder: "2027" },
+            { name: "is_active", label: "Active (offered to new registrations)", type: "checkbox", defaultValue: "true" },
           ]}
           empty="Add an intake batch, e.g. 2023–2027."
         />
@@ -136,12 +176,15 @@ export function SetupScreens({
           intro="A section is a class group: branch + year + batch + section letter. Students register into one."
           columns={[
             { key: "label", label: "Class group", render: (s) => <strong>{s.label}</strong> },
+            { key: "academic_year", label: "Academic year", render: (s) => s.academic_year ?? <span className="text-ash">—</span> },
             { key: "semester", label: "Sem", className: "font-mono tnum" },
             { key: "students", label: "Students", className: "font-mono tnum" },
+            { key: "is_active", label: "Status", render: (s) => activePill(s.is_active) },
           ]}
           toForm={(s) => ({
             department_id: String(s.department_id), batch_id: String(s.batch_id ?? ""), name: s.name,
             year: String(s.year), semester: String(s.semester),
+            academic_year_id: String(s.academic_year_id ?? ""), is_active: String(s.is_active),
           })}
           fields={[
             { name: "department_id", label: "Branch", type: "select", options: deptOpts, required: true },
@@ -149,6 +192,8 @@ export function SetupScreens({
             { name: "year", label: "Year", type: "number", required: true },
             { name: "semester", label: "Semester", type: "number", required: true },
             { name: "name", label: "Section", required: true, placeholder: "A" },
+            { name: "academic_year_id", label: "Academic year", type: "select", options: yearOpts, hint: "Used to filter approvals by academic year." },
+            { name: "is_active", label: "Active (offered to new registrations)", type: "checkbox", defaultValue: "true" },
           ]}
           empty="Create branches and batches first, then add sections."
         />

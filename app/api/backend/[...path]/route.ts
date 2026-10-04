@@ -18,6 +18,7 @@
 import { cookies } from "next/headers";
 
 import { ACCESS_COOKIE, API_BASE } from "@/lib/api";
+import { DEVICE_COOKIE } from "@/lib/device";
 
 /** Only the API surface the frontend uses. Keeps the proxy from becoming a hole. */
 const ALLOWED = [
@@ -31,7 +32,14 @@ const ALLOWED = [
   /^api\/live\/stream$/,
   /^api\/me(\/[a-z-]+(\/[a-z-]+)?(\/\d+)?)?$/,
   /^api\/(departments|programs|batches|sections|subjects|rooms|holidays|terms|assignments|timetable)(\/\d+)?$/,
-  /^api\/students(\/(import(\/template)?|\d+(\/[a-z-]+)?))?$/,
+  /^api\/students(\/(import(\/template)?|bulk-decision|\d+(\/[a-z-]+)?))?$/,
+  /^api\/academic-years(\/\d+)?$/,
+  /^api\/workspaces(\/\d+)?$/,
+  // Pairing (/api/tablets/pair) is NOT here: it returns the device token, which must go into an
+  // httpOnly cookie, so it has its own route handler (app/api/device/pair).
+  /^api\/tablets(\/(this-device|\d+(\/(cameras|pairing-code|revoke))?))?$/,
+  /^api\/admin\/(access-codes(\/(administrator|authority))?|overview)$/,
+  /^api\/access\/administrator$/,
   /^api\/(edit-requests|face-enrollments|reenroll-requests)(\/\d+(\/[a-z]+)?)?$/,
   /^api\/(leaves|issues|conversations|announcements|notifications)(\/[a-z-]+)?(\/\d+)?(\/[a-z-]+)?$/,
   /^api\/messages\/broadcast$/,
@@ -79,6 +87,10 @@ async function forward(request: Request, path: string[], method: string) {
   if (method !== "GET" && contentType) headers["Content-Type"] = contentType;
   const fwd = request.headers.get("x-forwarded-for");
   if (fwd) headers["X-Forwarded-For"] = fwd;
+  // A paired tablet proves itself with its device token, kept in an httpOnly cookie that page
+  // scripts cannot read; the backend decides what that device may do.
+  const device = store.get(DEVICE_COOKIE)?.value;
+  if (device) headers["X-Device-Token"] = device;
 
   let upstream: Response;
   try {

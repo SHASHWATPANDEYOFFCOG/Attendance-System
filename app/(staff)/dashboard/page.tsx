@@ -37,6 +37,14 @@ type LivePayload = {
   periods: { slot_id: number | null; subject_code: string | null; subject_name: string | null; start_time: string;
     section_label: string | null; holiday: string | null; session: { id: number; state: string; counts: Counts } | null }[];
 };
+type Overview = {
+  cameras: { total: number; online: number; offline: number; connecting: number; idle: number; disabled: number };
+  tablets: { total: number; active: number };
+  workspaces: number;
+  students: { pending: number; approved: number; rejected: number; revoked: number };
+  authorities?: { total: number; active: number };
+  is_administrator: boolean;
+};
 type ClassesPayload = { days: number; threshold_pct: number; classes: { section_id: number | null; label: string; pct: number | null; lectures: number }[] };
 
 export default async function DashboardPage() {
@@ -47,6 +55,7 @@ export default async function DashboardPage() {
   if (who?.scope === "self") redirect("/my-attendance");
 
   const raw = await apiGetAll({
+    overview: "/api/admin/overview",
     me: "/api/dashboard",
     summary: "/api/analytics/summary",
     trend: "/api/analytics/trend?days=30",
@@ -71,6 +80,7 @@ export default async function DashboardPage() {
 
   const me = safe(DashboardSchema, raw.me);
   const summary = safe(SummarySchema, raw.summary);
+  const overview = raw.overview as Overview | null;
   const trend = safe(TrendSchema, raw.trend);
   const weekday = safe(WeekdaySchema, raw.weekday);
   const defaulters = safe(DefaultersSchema, raw.defaulters);
@@ -104,6 +114,25 @@ export default async function DashboardPage() {
           Timetable). Until then you can already verify new student registrations of your branch under{" "}
           <Link href="/staff/approvals" className="text-ink underline">Approvals</Link>; you are notified of each one.
         </Banner>
+      ) : null}
+
+      {overview ? (
+        <section aria-label={overview.is_administrator ? "System overview" : "Your resources"} className="mb-4">
+          <h2 className="label m-0 mb-2 text-[12px] text-ash">{overview.is_administrator ? "System overview" : "Your workspaces and students"}</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {([
+              ["Cameras", overview.cameras.total, `${overview.cameras.online} online · ${overview.cameras.offline} offline`, "/staff/cameras", overview.cameras.offline ? "oxide" : "ink"],
+              ...(overview.authorities ? [["Authorities", overview.authorities.total, `${overview.authorities.active} active`, "/staff/admin/users", "ink"]] : []),
+              ["Tablets", overview.tablets.total, `${overview.tablets.active} active`, "/staff/tablets", "ink"],
+              ["Workspaces", overview.workspaces, "active", "/staff/workspaces", "ink"],
+              ["Students", overview.students.approved, `${overview.students.pending} pending · ${overview.students.rejected} rejected${overview.students.revoked ? ` · ${overview.students.revoked} revoked` : ""}`, "/staff/approvals", overview.students.pending ? "amber" : "verdant"],
+            ] as [string, number, string, string, "ink" | "oxide" | "amber" | "verdant"][]).map(([label, n, sub, href, tone]) => (
+              <Link key={label} href={href} className="no-underline">
+                <StatTile label={label} value={n} sub={sub} tone={tone} />
+              </Link>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <nav aria-label="Needs attention" className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">

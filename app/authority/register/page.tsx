@@ -22,12 +22,12 @@ type Options = {
 
 type Form = {
   full_name: string; email: string; mobile: string; employee_id: string; designation: string;
-  department_id: string; requested_role: string; password: string; confirm: string;
+  department_id: string; requested_role: string; password: string; confirm: string; access_code: string;
 };
 
 const EMPTY: Form = {
   full_name: "", email: "", mobile: "", employee_id: "", designation: "", department_id: "",
-  requested_role: "faculty", password: "", confirm: "",
+  requested_role: "faculty", password: "", confirm: "", access_code: "",
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,6 +35,7 @@ const PHONE_RE = /^\+?\d{10,15}$/;
 
 function validate(f: Form): Record<string, string> {
   const e: Record<string, string> = {};
+  if (!f.access_code.trim()) e.access_code = "Enter the authority access code your administrator gave you.";
   if (!f.full_name.trim()) e.full_name = "Enter your full name.";
   if (!EMAIL_RE.test(f.email.trim())) e.email = "Enter a valid email address.";
   if (!PHONE_RE.test(f.mobile.replace(/[\s\-()]/g, ""))) e.mobile = "Enter a 10–15 digit mobile number.";
@@ -79,7 +80,7 @@ export default function AuthorityRegisterPage() {
         full_name: form.full_name.trim(), email: form.email.trim(), mobile: form.mobile.trim(),
         employee_id: form.employee_id.trim(), designation: form.designation.trim() || null,
         department_id: Number(form.department_id), requested_role: form.requested_role,
-        password: form.password,
+        password: form.password, access_code: form.access_code.trim(),
       });
       router.push(res?.otp_sent
         ? `/verify-email?email=${encodeURIComponent(form.email.trim().toLowerCase())}`
@@ -111,6 +112,9 @@ export default function AuthorityRegisterPage() {
           <FormError>No branches have been set up yet. Ask the administrator to create your account.</FormError>
         ) : null}
         <form onSubmit={submit} noValidate className="mt-4 grid gap-3.5">
+          <TextField label="Authority access code" type="password" autoComplete="off" required value={form.access_code}
+                     onChange={set("access_code")} error={errors.access_code}
+                     hint="Only staff with this code can register. Ask your administrator for it." />
           <TextField label="Full name" required autoComplete="name" value={form.full_name}
                      onChange={set("full_name")} error={errors.full_name} />
           <div className="grid gap-3.5 sm:grid-cols-2">

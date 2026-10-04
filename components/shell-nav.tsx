@@ -6,6 +6,7 @@
  * so a reload or a deep link always highlights the right item.
  */
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -98,7 +99,10 @@ export function MobileNav({ groups, title }: { groups: NavGroup[]; title: string
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
-      {open ? (
+      {/* Portalled to <body>: the sticky top bar has a backdrop blur, and a blurred ancestor
+          becomes the containing block for `position: fixed` — the drawer would be clipped to the
+          bar's 70 px height instead of covering the screen. */}
+      {open && typeof document !== "undefined" ? createPortal(
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu" id="mobile-drawer">
           <button
             type="button"
@@ -120,7 +124,8 @@ export function MobileNav({ groups, title }: { groups: NavGroup[]; title: string
             </div>
             <Links groups={groups} onNavigate={() => setOpen(false)} />
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

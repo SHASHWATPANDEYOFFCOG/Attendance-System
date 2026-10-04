@@ -110,7 +110,7 @@ export type Me = {
   consent_given: boolean;
   has_biometrics: boolean;
   department_id: number | null;
-  student_status: "pending" | "approved" | "rejected" | null;
+  student_status: "pending" | "approved" | "rejected" | "revoked" | null;
   rejection_reason: string | null;
   email_verified: boolean;
 };

@@ -88,6 +88,14 @@ export default async function StudentHome() {
         }
       />
 
+      {me.student_status === "revoked" ? (
+        <Banner bad>
+          <strong className="label mb-0.5 block">Attendance access revoked</strong>
+          You can see your record, but you cannot mark attendance until a teacher restores your access.
+          {me.rejection_reason ? ` Reason given: ${me.rejection_reason}.` : ""} Contact your teacher or the college office.
+        </Banner>
+      ) : null}
+
       {!summary ? (
         <Banner bad>
           <strong className="label mb-0.5 block">Could not load</strong>

@@ -60,8 +60,9 @@ test("a student registers, is approved and reaches the dashboard", async ({ page
   const staff = await staffCtx.newPage();
   await signIn(staff, ADMIN.username, ADMIN.password, "authority");
   await staff.goto("/staff/approvals");
-  const card = staff.locator("li, article, section").filter({ hasText: name }).last();
-  await card.getByRole("button", { name: "Approve" }).click();
+  // A table row on wide screens, a card on phones: whichever is visible.
+  const row = staff.locator("tr:visible, li:visible").filter({ hasText: name }).last();
+  await row.getByRole("button", { name: "Approve" }).click();
   await staff.getByRole("dialog").getByRole("button", { name: "Approve" }).click();
   await expect(staff.getByText(name)).toHaveCount(0);
   await staffCtx.close();

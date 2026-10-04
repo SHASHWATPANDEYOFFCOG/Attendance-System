@@ -33,6 +33,8 @@ export type FieldDef = {
   when?: (form: Record<string, string>) => boolean;
   /** Changing this field clears these others (dependent dropdowns). */
   clears?: string[];
+  /** Initial value for a new row ("true" for a checkbox that starts ticked). */
+  defaultValue?: string;
 };
 
 export type Column<T> = { key: string; label: string; render?: (row: T) => ReactNode; className?: string };
@@ -102,7 +104,7 @@ export function CrudTable<T extends { id: number }>({
   }, [load]);
 
   const blank = () =>
-    Object.fromEntries(fields.map((f) => [f.name, f.type === "checkbox" ? "false" : ""]));
+    Object.fromEntries(fields.map((f) => [f.name, f.defaultValue ?? (f.type === "checkbox" ? "false" : "")]));
 
   function open(row: T | "new") {
     setEditing(row);

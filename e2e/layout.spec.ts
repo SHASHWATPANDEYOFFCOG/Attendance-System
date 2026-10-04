@@ -9,7 +9,8 @@ import { adminApi, approvedStudent, expectNoHorizontalScroll, makeClass, signIn,
 
 const PUBLIC = ["/login", "/signup", "/forgot-password", "/privacy", "/guide"];
 const STAFF = ["/dashboard", "/staff/sessions", "/mark", "/staff/reports", "/staff/students", "/staff/approvals",
-  "/staff/leaves", "/staff/issues", "/staff/messages", "/staff/setup", "/staff/cameras", "/staff/admin/settings"];
+  "/staff/leaves", "/staff/issues", "/staff/messages", "/staff/setup", "/staff/cameras", "/staff/admin/settings",
+  "/staff/workspaces", "/staff/tablets", "/staff/admin/access", "/staff/setup?tab=years"];
 const STUDENT = ["/student", "/student/mark", "/student/history", "/student/leaves", "/student/issues",
   "/student/messages", "/student/profile", "/student/face"];
 

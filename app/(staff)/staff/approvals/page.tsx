@@ -13,11 +13,8 @@ import { Button } from "@/components/forms";
 import { EmptyState, PageError, PageLoading } from "@/components/states";
 import { useUi } from "@/components/toast";
 import { FaceReview } from "@/components/face-review";
+import { ApprovalManagement } from "@/components/approval-management";
 
-type Pending = {
-  id: number; full_name: string; email: string | null; roll_number: string | null; section: string | null;
-  department: string | null; batch: string | null; email_verified: boolean; photo_url: string | null; created_at: string;
-};
 type EditReq = {
   id: number; student_id: number; student: string; roll_number: string | null;
   changes: Record<string, unknown>; current: Record<string, unknown>; reason: string; created_at: string;
@@ -33,7 +30,7 @@ type StaffReq = {
 };
 
 const TABS = [
-  ["registrations", "Registrations"],
+  ["registrations", "Students"],
   ["edits", "Profile edits"],
   ["faces", "Face enrollments"],
   ["staff", "Staff"],
@@ -67,7 +64,7 @@ function Approvals() {
 
   return (
     <Page wide>
-      <PageHeader title="Approvals" subtitle="Registrations, profile corrections, face enrollments and staff requests waiting for you" />
+      <PageHeader title="Approval management" subtitle="Students by status, profile corrections, face enrollments and staff requests" />
       <nav aria-label="Approval types" className="mb-4 flex flex-wrap gap-1">
         {tabs.map(([key, label]) => (
           <Link
@@ -85,83 +82,8 @@ function Approvals() {
       {tab === "edits" ? <EditRequests onChange={loadSummary} />
         : tab === "faces" ? <FaceReview onChange={loadSummary} />
         : tab === "staff" ? <StaffRequests onChange={loadSummary} />
-        : <Registrations onChange={loadSummary} />}
+        : <ApprovalManagement onChange={loadSummary} />}
     </Page>
-  );
-}
-
-function Registrations({ onChange }: { onChange: () => void }) {
-  const { toast, confirm, askReason } = useUi();
-  const [rows, setRows] = useState<Pending[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(async () => {
-    try {
-      const r = await api.get<{ rows: Pending[] }>("/api/students?status=pending&page_size=200");
-      setRows(r.rows);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load.");
-    }
-  }, []);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function decide(s: Pending, approve: boolean) {
-    try {
-      if (approve) {
-        if (!(await confirm({
-          title: `Approve ${s.full_name}?`, confirmLabel: "Approve",
-          body: s.email_verified ? undefined
-            : "Their email is not verified yet (the code may not have reached them). Approving confirms it, so check the address is really theirs.",
-        }))) return;
-        await api.post(`/api/students/${s.id}/approve`);
-        toast(`${s.full_name} approved.`);
-      } else {
-        const reason = await askReason({
-          title: `Reject ${s.full_name}?`, confirmLabel: "Reject", danger: true,
-          reason: { label: "Reason shown to the student", minLength: 3 },
-        });
-        if (!reason) return;
-        await api.post(`/api/students/${s.id}/reject`, { reason });
-        toast(`${s.full_name} rejected.`);
-      }
-      load();
-      onChange();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Action failed.", "bad");
-    }
-  }
-
-  if (error) return <PageError message={error} retry={load} />;
-  if (!rows) return <PageLoading />;
-  if (!rows.length) return <EmptyState title="No registrations waiting">New sign-ups for your classes appear here.</EmptyState>;
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {rows.map((s) => (
-        <Card key={s.id}>
-          <div className="flex gap-3">
-            <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[3px] border border-rule bg-paper">
-              {s.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/backend${s.photo_url}`} alt="" className="h-full w-full object-cover" />
-              ) : null}
-            </div>
-            <div className="min-w-0 flex-1">
-              <Link href={`/staff/students/${s.id}`} className="font-semibold text-ink">{s.full_name}</Link>
-              <div className="font-mono text-[12px] text-ash">{s.roll_number} · {s.section}</div>
-              <div className="truncate text-[12.5px] text-ash">{s.email}</div>
-              {!s.email_verified ? <Pill tone="warn">email not verified · approving confirms it</Pill> : null}
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => decide(s, true)}>Approve</Button>
-            <Button onClick={() => decide(s, false)}>Reject</Button>
-            <Link href={`/staff/students/${s.id}`} className="display self-center px-2 text-[11.5px] text-ink">Full details</Link>
-          </div>
-        </Card>
-      ))}
-    </div>
   );
 }
 

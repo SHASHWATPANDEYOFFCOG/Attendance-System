@@ -11,6 +11,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import Link from "next/link";
+
 import { api } from "@/lib/client";
 import { Button, SelectField } from "@/components/forms";
 import { Banner, Card, CardHeader, Pill } from "@/components/ui";
@@ -20,7 +22,32 @@ import { useUi } from "@/components/toast";
 /* ------------------------------------------------------------ classroom camera */
 
 type Cam = { id: number; name: string; room: string; status: string; detail: string | null; running: boolean };
-type CamState = { connected: Cam | null; in_room: Cam[]; available: Cam[] };
+type CamState = {
+  connected: Cam | null; in_room: Cam[]; available: Cam[];
+  allowed: boolean; reason: string | null; tablet: { name: string; code: string } | null;
+};
+
+/** Shown instead of controls the server would refuse from this device. */
+function TabletNeeded({ reason }: { reason: string | null }) {
+  return (
+    <Banner>
+      <strong className="label mb-0.5 block">Registered tablet needed</strong>
+      {reason ?? "Use a registered tablet for this."}{" "}
+      <Link href="/staff/tablets" className="text-ink underline">Open Tablets</Link> to register and pair this device.
+    </Banner>
+  );
+}
+
+/** Whether this device may take attendance / control cameras for the lecture (server's answer). */
+function useDeviceGate(sessionId: number) {
+  const [gate, setGate] = useState<{ allowed: boolean; reason: string | null; tablet: CamState["tablet"] } | null>(null);
+  useEffect(() => {
+    api.get<CamState>(`/api/sessions/${sessionId}/camera`)
+      .then((s) => setGate({ allowed: s.allowed, reason: s.reason, tablet: s.tablet }))
+      .catch(() => setGate({ allowed: true, reason: null, tablet: null }));
+  }, [sessionId]);
+  return gate;
+}
 
 export function ClassCamera({ sessionId, live }: { sessionId: number; live: boolean }) {
   const { toast, confirm } = useUi();
@@ -35,7 +62,7 @@ export function ClassCamera({ sessionId, live }: { sessionId: number; live: bool
       setState(s);
       setChoice((c) => c || String(s.in_room[0]?.id ?? s.available[0]?.id ?? ""));
     } catch {
-      setState({ connected: null, in_room: [], available: [] });
+      setState({ connected: null, in_room: [], available: [], allowed: true, reason: null, tablet: null });
     }
   }, [sessionId]);
   useEffect(() => {
@@ -89,7 +116,9 @@ export function ClassCamera({ sessionId, live }: { sessionId: number; live: bool
         title="Classroom camera"
         meta={cam ? <Pill tone={cam.running ? "ok" : "warn"}>{cam.running ? "watching" : cam.status}</Pill> : roomCam ? <Pill tone="ok">room camera on</Pill> : null}
       />
-      {!state ? <p className="m-0 text-[13.5px] text-ash">Loading cameras…</p> : cam ? (
+      {!state ? <p className="m-0 text-[13.5px] text-ash">Loading cameras…</p> : !state.allowed ? (
+        <TabletNeeded reason={state.reason} />
+      ) : cam ? (
         <div className="grid gap-3">
           <p className="m-0 text-[13.5px]">
             <strong>{cam.name}</strong> <span className="text-ash">({cam.room})</span> is connected to this lecture and marks
@@ -107,8 +136,10 @@ export function ClassCamera({ sessionId, live }: { sessionId: number; live: bool
         </div>
       ) : state.available.length === 0 ? (
         <p className="m-0 text-[13.5px] text-ash">
-          No cameras are registered yet. An administrator adds them under CCTV cameras (stream address and login).
-          Meanwhile, use the tablet photo instead.
+          {state.tablet
+            ? `This tablet (${state.tablet.name}) has no cameras assigned. Assign them under Tablets.`
+            : "No camera you may use is registered. An administrator adds cameras and assigns them to your workspace."}{" "}
+          Meanwhile, use the tablet photo.
         </p>
       ) : !live ? (
         <p className="m-0 text-[13.5px] text-ash">Start the lecture to connect a camera.</p>
@@ -174,6 +205,7 @@ export function TabletPhoto({ sessionId, live, onMarked }: { sessionId: number; 
   const [info, setInfo] = useState<{ roster: number; enrolled: number } | null>(null);
   const [ticked, setTicked] = useState<Set<number>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+  const gate = useDeviceGate(sessionId);
 
   useEffect(() => {
     if (viewfinder) camStart();
@@ -261,6 +293,8 @@ export function TabletPhoto({ sessionId, live, onMarked }: { sessionId: number; 
       <CardHeader title="Tablet photo" meta={info ? `${info.enrolled} of ${info.roster} students have an approved face` : "photograph the class"} />
       {!live ? (
         <p className="m-0 text-[13.5px] text-ash">Start the lecture to take attendance from a photo.</p>
+      ) : gate && !gate.allowed ? (
+        <TabletNeeded reason={gate.reason} />
       ) : (
         <div className="grid gap-3">
           <p className="m-0 text-[13.5px] text-ash">

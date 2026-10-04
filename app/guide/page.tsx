@@ -1,4 +1,5 @@
-/** Short user guide for students and teachers. Public, so it helps before the first sign-in. */
+/** User guide for administrators, authorities, tablets, teachers and students. Public, so it
+ *  helps before the first sign-in; it never shows the access codes themselves. */
 import Link from "next/link";
 
 import { PublicShell } from "@/components/public-shell";
@@ -39,8 +40,92 @@ export default async function GuidePage() {
   return (
     <PublicShell width={820} subtitle="User guide">
       <div className="grid gap-4">
+        <h1 className="display m-0 text-center text-[22px]">User guide</h1>
+        <nav aria-label="Guide sections" className="flex flex-wrap justify-center gap-1.5 text-[13px]">
+          {[["#administrator", "Administrator"], ["#authority", "Authority"], ["#tablet", "Tablet"], ["#teachers", "Taking attendance"], ["#students", "Students"]].map(([href, label]) => (
+            <a key={href} href={href} className="display rounded-[3px] border border-rule px-3 py-1.5 text-[11.5px] text-ink no-underline hover:bg-tint">{label}</a>
+          ))}
+        </nav>
+
+        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="administrator">
+          <h2 id="administrator" className="display m-0 mb-1 text-[20px]">Administrator guide</h2>
+          <p className="mb-3 mt-0 text-[13.5px] text-ash">Administrators control the whole system. You need an authority account and the administrator code.</p>
+          <ol className="m-0 grid list-none gap-3.5 p-0">
+            <Step n={1} title="Sign in and become administrator">
+              Register at <Link href="/authority/register" className="underline">Authority register</Link> (with the authority code) or use the
+              account you were given, sign in at <Link href="/authority/login" className="underline">Authority sign in</Link>, then open{" "}
+              <em>Administration → Administrator access</em> and enter the administrator code.
+            </Step>
+            <Step n={2} title="Change the access codes">
+              <em>Settings → Access codes</em>: set your own administrator code and authority code. The old code stops working at once. Codes
+              are stored only as one-way hashes, so keep the new ones somewhere safe.
+            </Step>
+            <Step n={3} title="Build the academic structure">
+              <em>Academic setup</em>: add academic years (mark the current one), branches, batches, class groups (sections, each with its year
+              and academic year), subjects, rooms, the term and the timetable. Anything can be deactivated instead of deleted: it disappears
+              from registration but its history stays.
+            </Step>
+            <Step n={4} title="Create workspaces">
+              <em>Workspaces</em>: a workspace groups cameras and tablets, e.g. &quot;CSE Block&quot;. Add the authorities who may use it.
+            </Step>
+            <Step n={5} title="Add cameras">
+              <em>CCTV cameras → Add camera</em>: name, type, the stream address (without login), the login in its own fields, the room it
+              watches and its workspace. Press <em>Test connection</em> to see a frame. Only the workspace&apos;s authorities can use it.
+            </Step>
+            <Step n={6} title="Manage authorities">
+              <em>Staff &amp; roles</em>: add teachers and HODs, change roles, disable or re-enable accounts. HOD rights are only ever given
+              here, by an administrator.
+            </Step>
+            <Step n={7} title="Monitor">
+              The dashboard shows cameras online/offline, authorities, tablets, workspaces and students by approval status.{" "}
+              <em>Audit log</em> records every sensitive action: who, when, what changed.
+            </Step>
+          </ol>
+        </section>
+
+        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="authority">
+          <h2 id="authority" className="display m-0 mb-1 text-[20px]">Authority guide (teachers and HODs)</h2>
+          <ol className="m-0 grid list-none gap-3.5 p-0">
+            <Step n={1} title="Get an account">
+              Register at <Link href="/authority/register" className="underline">Authority register</Link> with the authority code from your
+              administrator, then sign in at <Link href="/authority/login" className="underline">Authority sign in</Link>.
+            </Step>
+            <Step n={2} title="Your workspace">
+              An administrator adds you to a workspace. <em>Workspaces</em> shows yours, with its cameras; you see nothing of other workspaces.
+            </Step>
+            <Step n={3} title="Register your tablet">
+              <em>Tablets → Register a tablet</em>: give it a name, choose the workspace and the cameras it may use. You get a one-time pairing
+              code, valid for 15 minutes. Pair the tablet with it (see the tablet guide below).
+            </Step>
+            <Step n={4} title="Approve students">
+              <em>Approvals → Students</em>: filter by academic year, branch, batch, year and section; switch between Pending, Approved, Rejected
+              and Revoked. Approve, reject (with a reason), revoke or restore, one at a time or by ticking several. Every decision is logged.
+            </Step>
+            <Step n={5} title="Look after your tablets">
+              Disable a tablet you are not using, issue a new pairing code to replace a device, or revoke a lost tablet: it stops working on
+              its next request.
+            </Step>
+          </ol>
+        </section>
+
+        <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="tablet">
+          <h2 id="tablet" className="display m-0 mb-1 text-[20px]">Tablet guide</h2>
+          <ol className="m-0 grid list-none gap-3.5 p-0">
+            <Step n={1} title="Open the website on the tablet">Use its browser (Chrome or Safari). Add it to the home screen for an app-like icon.</Step>
+            <Step n={2} title="Sign in">At <Link href="/authority/login" className="underline">Authority sign in</Link>, with your own authority account.</Step>
+            <Step n={3} title="Pair the device">
+              Open <em>Tablets</em>. Under <em>This device</em>, enter the 8-character pairing code shown when the tablet was registered. The
+              tablet now shows as active, with its workspace and cameras.
+            </Step>
+            <Step n={4} title="Take attendance">
+              Open a live lecture (<em>Live sessions → Take attendance</em>). <em>Tablet photo</em> photographs the class;{" "}
+              <em>Classroom camera</em> connects one of the tablet&apos;s cameras. The tablet can only use the cameras assigned to it.
+            </Step>
+          </ol>
+        </section>
+
         <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="students">
-          <h1 id="students" className="display m-0 mb-3 text-[20px]">For students</h1>
+          <h2 id="students" className="display m-0 mb-3 text-[20px]">Student guide</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Register">
               Open <Link href="/signup" className="underline">Register</Link>, fill in your details exactly as in college
@@ -78,7 +163,7 @@ export default async function GuidePage() {
         </section>
 
         <section className="rounded-[3px] border border-rule bg-card p-5 shadow-lift sm:p-6" aria-labelledby="teachers">
-          <h2 id="teachers" className="display m-0 mb-3 text-[20px]">For teachers</h2>
+          <h2 id="teachers" className="display m-0 mb-3 text-[20px]">Taking attendance (teachers)</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Your classes">
               Sign in at <Link href="/authority/login" className="underline">Authority sign in</Link>; you land on the

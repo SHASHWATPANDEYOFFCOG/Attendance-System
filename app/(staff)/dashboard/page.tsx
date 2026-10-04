@@ -97,6 +97,15 @@ export default async function DashboardPage() {
         </div>
       </header>
 
+      {me?.role === "faculty" && classes && classes.classes.length === 0 ? (
+        <Banner>
+          <strong className="label mb-0.5 block">Welcome — no classes assigned to you yet</strong>
+          Your HOD or the administrator assigns your subjects and classes (Academic setup → Teacher assignments and
+          Timetable). Until then you can already verify new student registrations of your branch under{" "}
+          <Link href="/staff/approvals" className="text-ink underline">Approvals</Link>; you are notified of each one.
+        </Banner>
+      ) : null}
+
       <nav aria-label="Needs attention" className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {attention.map(([label, n, href]) => (
           <Link key={href} href={href} className="no-underline">
@@ -205,9 +214,9 @@ export default async function DashboardPage() {
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile
           label="Average attendance"
-          value={summary ? `${summary.average_pct}%` : "—"}
-          tone={summary && summary.average_pct < summary.threshold_pct ? "oxide" : "ink"}
-          sub={summary ? `minimum ${summary.threshold_pct}%` : undefined}
+          value={summary && summary.records_counted > 0 ? `${summary.average_pct}%` : "—"}
+          tone={summary && summary.records_counted > 0 && summary.average_pct < summary.threshold_pct ? "oxide" : "ink"}
+          sub={summary && summary.records_counted > 0 ? `minimum ${summary.threshold_pct}%` : "no lectures recorded yet"}
         />
         <StatTile
           label="Defaulters"

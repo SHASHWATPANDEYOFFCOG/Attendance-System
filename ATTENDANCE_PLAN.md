@@ -166,7 +166,8 @@ download is needed; the browser only guides capture.
   student can defeat it unless PAD weights are configured — stated in the UI and docs.
 * **Manual changes** of an existing status require a reason, recorded per change in the audit log.
 * **Email**: SMTP from env. Without `SMTP_HOST`, mail is written to `var/outbox/*.eml` and the
-  system-status panel says so (development only; production refuses to start without SMTP).
+  admin dashboard shows an "EMAIL NOT DELIVERED" warning. (Decided against refusing to start: a
+  college without mail yet should still be able to run attendance; the warning is unmissable.)
 
 ---
 

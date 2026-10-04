@@ -75,6 +75,15 @@ def _commit(db: Session, conflict: str) -> None:
         raise HTTPException(409, conflict)
 
 
+def _flush(db: Session, conflict: str) -> None:
+    """Flush to get an id, turning a uniqueness clash into the same 409 `_commit` gives."""
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, conflict)
+
+
 def _refuse_if(count: int, message: str) -> None:
     if count:
         raise HTTPException(409, message.format(n=count))
@@ -134,7 +143,7 @@ def create_department(body: DepartmentIn, request: Request, db: Session = Depend
                       actor: User = Depends(require_super_admin)):
     d = Department(code=body.code, name=body.name.strip())
     db.add(d)
-    db.flush()
+    _flush(db, f"a branch with code {body.code} already exists")
     # Every branch gets a default program so sections can be created straight away.
     db.add(Program(department_id=d.id, name=f"B.Tech {body.code}", duration_years=4))
     audit(db, actor, "branch_created", target_type="department", target_id=d.id,
@@ -214,7 +223,7 @@ def create_program(body: ProgramIn, request: Request, db: Session = Depends(get_
     p = Program(department_id=body.department_id, name=body.name.strip(),
                 duration_years=body.duration_years)
     db.add(p)
-    db.flush()
+    _flush(db, "that program already exists in this branch")
     audit(db, actor, "program_created", target_type="program", target_id=p.id, request=request)
     _commit(db, "that program already exists in this branch")
     return {"id": p.id, "department_id": p.department_id, "name": p.name,
@@ -283,7 +292,7 @@ def create_batch(body: BatchIn, request: Request, db: Session = Depends(get_db),
                  actor: User = Depends(require_super_admin)):
     b = Batch(label=_batch_label(body), start_year=body.start_year, end_year=body.end_year)
     db.add(b)
-    db.flush()
+    _flush(db, f"batch {b.label} already exists")
     audit(db, actor, "batch_created", target_type="batch", target_id=b.id, request=request)
     _commit(db, f"batch {b.label} already exists")
     return {"id": b.id, "label": b.label, "start_year": b.start_year, "end_year": b.end_year}
@@ -385,7 +394,7 @@ def create_section(body: SectionIn, request: Request, db: Session = Depends(get_
     s = Section(program_id=p.id, name=body.name.strip().upper(), year=body.year,
                 semester=body.semester, batch_id=body.batch_id)
     db.add(s)
-    db.flush()
+    _flush(db, "that section already exists for this year and semester")
     audit(db, actor, "section_created", target_type="section", target_id=s.id, request=request)
     _commit(db, "that section already exists for this year and semester")
     db.refresh(s)
@@ -473,7 +482,7 @@ def create_subject(body: SubjectIn, request: Request, db: Session = Depends(get_
                 department_id=body.department_id, year=body.year, semester=body.semester,
                 credits=body.credits)
     db.add(s)
-    db.flush()
+    _flush(db, f"subject code {s.code} is already in use")
     audit(db, actor, "subject_created", target_type="subject", target_id=s.id, request=request)
     _commit(db, f"subject code {s.code} is already in use")
     db.refresh(s)
@@ -547,7 +556,7 @@ def create_room(body: RoomIn, request: Request, db: Session = Depends(get_db),
         raise HTTPException(422, "Give both latitude and longitude, or neither.")
     r = Room(**{**body.model_dump(), "name": body.name.strip()})
     db.add(r)
-    db.flush()
+    _flush(db, f"room {r.name} already exists")
     audit(db, actor, "room_created", target_type="room", target_id=r.id, request=request)
     _commit(db, f"room {r.name} already exists")
     return _room_out(r)
@@ -624,7 +633,7 @@ def create_holiday(body: HolidayIn, request: Request, db: Session = Depends(get_
         raise HTTPException(404, f"no branch with code {scope}")
     h = Holiday(date=body.date, name=body.name.strip(), applies_to=scope)
     db.add(h)
-    db.flush()
+    _flush(db, "that date is already a holiday for this scope")
     audit(db, actor, "holiday_created", target_type="holiday", target_id=h.id,
           detail={"date": body.date.isoformat(), "scope": scope or "all"}, request=request)
     _commit(db, "that date is already a holiday for this scope")
@@ -695,7 +704,7 @@ def create_term(body: TermIn, request: Request, db: Session = Depends(get_db),
     t = AcademicTerm(name=body.name.strip(), start_date=body.start_date, end_date=body.end_date,
                      is_active=False)
     db.add(t)
-    db.flush()
+    _flush(db, f"a term named {t.name} already exists")
     if body.is_active:
         _activate(db, t)
     audit(db, actor, "term_created", target_type="term", target_id=t.id, request=request)
@@ -805,7 +814,7 @@ def create_assignment(body: AssignmentIn, request: Request, db: Session = Depend
     a = FacultyAssignment(faculty_id=body.faculty_id, subject_id=subj.id, section_id=sec.id,
                           term_id=term.id)
     db.add(a)
-    db.flush()
+    _flush(db, "this teacher is already assigned to that subject and section")
     audit(db, actor, "assignment_created", target_type="assignment", target_id=a.id,
           detail=body.model_dump(), request=request)
     _commit(db, "this teacher is already assigned to that subject and section")
@@ -964,7 +973,7 @@ def create_slot(body: SlotIn, request: Request, db: Session = Depends(get_db),
                       faculty_id=body.faculty_id, term_id=term.id, day_of_week=body.day_of_week,
                       start_minute=start, end_minute=end, room=body.room.strip())
     db.add(s)
-    db.flush()
+    _flush(db, "this class already has a period starting at that time")
     audit(db, actor, "timetable_slot_created", target_type="timetable_slot", target_id=s.id,
           detail=body.model_dump(), request=request)
     _commit(db, "this class already has a period starting at that time")
@@ -1032,6 +1041,9 @@ def academic_options(db: Session = Depends(get_db)):
         "org_name": s_all["org_name"],
         "retention": {"review_days": s_all["review_retention_days"],
                       "thumbnail_days": s_all["thumbnail_retention_days"]},
+        "policy": {"present_window_min": s_all["present_window_min"],
+                   "late_window_min": s_all["late_window_min"],
+                   "min_attendance_pct": s_all["min_attendance_pct"]},
         "departments": [{"id": d.id, "code": d.code, "name": d.name,
                          "years": int(max_years.get(d.id) or 4)}
                         for d in db.scalars(select(Department).order_by(Department.code))],

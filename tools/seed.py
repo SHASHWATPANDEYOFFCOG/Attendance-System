@@ -1,4 +1,4 @@
-"""Create the first admin account, and optionally a demo session for a first run.
+"""Create the first (super admin) account, and optionally a demo session for a first run.
 
     python tools/seed.py --admin root --password "choose-something-strong"
     python tools/seed.py --admin root --password "..." --demo
@@ -49,7 +49,9 @@ def main() -> None:
     db = SessionLocal()
     try:
         print("accounts:")
-        ensure_user(db, args.admin, "Administrator", Role.ADMIN, args.password)
+        # The first account must be able to do everything: settings, staff, every department.
+        # A plain admin is an HOD scoped to one department, and with no department sees nothing.
+        ensure_user(db, args.admin, "Administrator", Role.SUPER_ADMIN, args.password)
 
         if not args.demo:
             return

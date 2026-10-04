@@ -9,6 +9,45 @@ role decides what fills it.
 > **Read [PRIVACY.md](PRIVACY.md) before pointing a camera at anyone.** This is biometric
 > identification by a fixed camera — the most legally sensitive configuration here.
 
+## The attendance portal
+
+A complete web portal is built on top of the recognition pipeline (`web-next/` front end,
+`app/` API):
+
+- **Students** register themselves (email OTP, profile photo, staff approval), enrol their face
+  with consent and a liveness check, and mark attendance from their phone or laptop during a
+  live lecture — face check or rotating classroom QR/code, inside a campus geofence. They see
+  their percentage overall and per subject, how many classes they can still miss, a calendar
+  and full history (PDF), apply for leave, raise issues, and message teachers.
+- **Teachers / HODs / admins** manage branches, batches, class groups, subjects, rooms, terms,
+  timetable and holidays; approve registrations, profile edits and face enrolments; run live
+  sessions (auto-started from the timetable, projector QR, manual P/L/A/O/E with reasons and an
+  audit log); review uncertain CCTV matches; approve leave; answer issues; send messages and
+  notices; and pull daily, monthly, subject-wise, student-wise and defaulter reports as CSV,
+  Excel or PDF. Teachers only ever see their own classes — enforced by the API, not the menu.
+- **CCTV**: RTSP cameras mapped to rooms recognise only the students rostered for the lecture
+  running in that room, only while it runs; unsure matches go to review, never auto-marked.
+- Email + real-time in-app notifications, installable as a phone app (PWA), dark mode,
+  works at 360 px.
+
+**Try it locally** (Python 3.10–3.12, Node 20+):
+
+```powershell
+py -3.12 -m venv .venv; .venv\Scripts\Activate.ps1; pip install -e ".[dev]"
+$env:ATTENDANCE_DB_URL = "sqlite:///var/demo.db"
+python tools\seed_portal.py --password "Demo-Pass-123"      # demo college; prints the logins
+python -m uvicorn app.api:app --host 127.0.0.1 --port 8079   # terminal 1 (same DB URL)
+
+cd web-next; npm ci; npm run build
+$env:ATTENDANCE_INSECURE_COOKIES = "1"; npx next start -p 3001   # terminal 2
+# open http://localhost:3001  — admin / teacher.cse / 23cse001, password Demo-Pass-123
+```
+
+**Deploy for real:** [docs/DEPLOY.md](docs/DEPLOY.md) — environment variables
+([.env.example](.env.example)), HTTPS, adding CCTV cameras and finding RTSP addresses, campus
+geofence, tuning the face threshold, backups. **Users:** [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+(also in the app at `/guide`).
+
 ---
 
 ## Status — what is verified, and what is not
@@ -36,8 +75,8 @@ Stated plainly, because a dashboard on an unverified pipeline is a demo, not a s
   pessimistic for this hardware.
 - Embedding dimension is 512 and L2-normalisation round-trips to unit norm, so `IndexFlatIP`
   really is cosine similarity.
-- **82 automated tests pass** (`pytest -q`): state machine, attendance rules, authorization,
-  recompute/override/CSV, and a worker integration suite driven by a fake camera.
+- **The automated test suite passes** (`pytest -q`): state machine, attendance rules, authorization,
+  recompute/override/CSV, a worker integration suite driven by a fake camera, and the portal APIs.
 - **34 HTTP checks pass** against a live `uvicorn` server (`tools/smoke_http.py`): every page
   serves, login/refresh work, role boundaries hold, CSV matches JSON.
 
@@ -118,14 +157,16 @@ templates survive a restart) with a warning. `ATTENDANCE_ENV=production` turns t
 
 ## Run
 
+The portal: see [The attendance portal](#the-attendance-portal) above and
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
+The original no-build kiosk dashboard is still served by the API:
+
 ```powershell
 python tools\seed.py --admin root --password "<strong password>" --demo
 python -m uvicorn app.api:app --port 8077
 # http://127.0.0.1:8077  ->  /static/login.html
 ```
-
-Then: enrol faces at `/static/enroll.html`, register a camera and session at
-`/static/sessions.html`, and start the camera from the dashboard.
 
 ## Derive your thresholds
 
@@ -207,12 +248,16 @@ app/
   rules.py         compute_attendance()                  (pure)
   worker.py        one supervised thread per camera
   api.py           FastAPI: auth, enrol, cameras, sessions, SSE, reports
-  models.py db.py auth.py crypto.py bus.py enroll.py
+  routes/          portal API: accounts, students, academic setup, sessions, face, leaves,
+                   issues, messaging, notifications, cameras, reports, admin
+  session_service.py marking_service.py selfmark.py liveness.py geo.py cctv.py scheduler.py
+  models.py db.py migrate.py auth.py crypto.py scope.py notify.py mailer.py settings_service.py
   gallery_service.py  attendance_service.py  pipeline_service.py  schemas.py
-web/             dashboard, login, enrol, sessions, reports — no framework, no build step
-tools/           check_env, bench_cpu, roc, seed, smoke_http
-tests/           82 tests, none needing a model download or a camera
-docs/upstream/   the original occlubio docs, for reference
+web-next/        the portal front end (Next.js): student portal, staff portal, PWA; e2e/ tests
+web/             original kiosk dashboard — no framework, no build step
+tools/           seed_portal (demo data), seed (first admin), backup, roc, check_env, bench_cpu
+tests/           backend tests, none needing a model download or a camera
+docs/            DEPLOY.md, USER_GUIDE.md, SCHEMA.md; upstream/ = original occlubio docs
 ```
 
 **Nothing under `occlubio/` is edited.** Behaviour changes go in `configs/default.yaml` or in
@@ -227,8 +272,9 @@ Every threshold lives in `configs/default.yaml`. There are no magic numbers in `
 ## Tests
 
 ```powershell
-pytest -q                                  # 82 passed
-python tools\smoke_http.py --password ...  # 34 checks against a running server
+pytest -q                                  # backend: rules, permissions, every portal API, tools
+cd web-next; npm run test:e2e              # browsers: Chromium/WebKit at 360 px, Chromium/Firefox desktop
+python tools\smoke_http.py --password ...  # checks against a running kiosk server
 ```
 
 `tests/test_worker_integration.py` drives the **real** tracker, FAISS gallery, state machine,
@@ -238,8 +284,9 @@ on real faces — only `tools/roc.py` on real identities can.
 
 ## Out of scope
 
-AdaFace fine-tuning, DeepStream/Jetson port, Celery/Postgres migration, mobile app,
-multi-tenancy. Seams are left clean; none of it is built.
+AdaFace fine-tuning, DeepStream/Jetson port, a native mobile app (the portal is an installable
+web app instead), multi-tenancy. PostgreSQL works via `ATTENDANCE_DB_URL` but is not exercised by
+the test suite, which runs on SQLite. Seams are left clean.
 
 Revisit fine-tuning only if masked-face TAR is measurably poor **and** thresholding cannot fix
 it — the stock `buffalo_l` embedder plus a well-chosen threshold is enough to get an attendance

@@ -130,6 +130,23 @@ def test_teacher_cannot_create_branches_or_sections(api, campus):
                     headers=campus["teacher_a"]).status_code == 403
 
 
+def test_duplicates_in_academic_setup_are_a_clear_409_not_a_server_error(api, campus):
+    """Found by the Firefox e2e run: a repeated batch used to escape as a 500 at flush time."""
+    admin = campus["admin"]
+    cases = [
+        ("/api/batches", {"start_year": 2023, "end_year": 2027}, "already exists"),
+        ("/api/departments", {"code": "CSE", "name": "Again"}, "already exists"),
+        ("/api/sections", {"department_id": campus["cse"], "batch_id": campus["batch"], "name": "A",
+                           "year": 2, "semester": 3}, "already exists"),
+    ]
+    for path, body, phrase in cases:
+        r = api.post(path, json=body, headers=admin)
+        assert r.status_code == 409, (path, r.status_code, r.text)
+        assert phrase in r.json()["detail"]
+    # The session is still usable after the rollback.
+    assert api.post("/api/batches", json={"start_year": 2031, "end_year": 2035}, headers=admin).status_code == 201
+
+
 def test_hod_is_confined_to_own_branch(api, campus, make_user):
     _, hod = make_user("hod.cse", role="admin", department_id=campus["cse"])
     ok = api.post("/api/sections", json={"department_id": campus["cse"], "batch_id": campus["batch"],

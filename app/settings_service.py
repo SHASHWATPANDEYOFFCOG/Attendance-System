@@ -51,6 +51,11 @@ SPECS: Dict[str, Spec] = {
     "org_name": Spec("str", _cfg("attendance.organisation", "Attendance Register"),
                      "College / institute name", "Printed on every report and email.",
                      group="general"),
+    "email_verification_required": Spec(
+        "bool", _const(False), "Email code at registration",
+        "On: new students and staff must enter a 6-digit code emailed to them before they can "
+        "sign in (needs working email). Off: the address is accepted as typed; teachers and "
+        "admins still check each person when approving.", group="general"),
     "staff_registration_approval": Spec(
         "bool", _const(False), "Staff registrations need approval",
         "Off: a teacher who registers at /authority/register can sign in as soon as their email "

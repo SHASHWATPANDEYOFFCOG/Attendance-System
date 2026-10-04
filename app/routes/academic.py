@@ -1044,7 +1044,8 @@ def academic_options(db: Session = Depends(get_db)):
         "policy": {"present_window_min": s_all["present_window_min"],
                    "late_window_min": s_all["late_window_min"],
                    "min_attendance_pct": s_all["min_attendance_pct"],
-                   "staff_registration_approval": s_all["staff_registration_approval"]},
+                   "staff_registration_approval": s_all["staff_registration_approval"],
+                   "email_verification_required": s_all["email_verification_required"]},
         "departments": [{"id": d.id, "code": d.code, "name": d.name,
                          "years": int(max_years.get(d.id) or 4)}
                         for d in db.scalars(select(Department).order_by(Department.code))],

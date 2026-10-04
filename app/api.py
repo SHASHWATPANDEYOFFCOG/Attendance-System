@@ -279,6 +279,15 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
                                 detail=f"{MAX_FAILED_LOGINS} failed sign-ins"))
             db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid username or password")
+    # Email codes switched off (the default): an address still waiting for its code — from a
+    # sign-up made while codes were on, or one whose code never arrived — is accepted now that
+    # its owner has proved they know the password.
+    from app.routes.accounts import confirm_email, email_code_required
+
+    if user.email_verified_at is None and not email_code_required(db):
+        confirm_email(db, user)
+        db.commit()
+
     if not user.is_active:
         # A staff member who registered themselves: say where their request stands (only to
         # someone who just proved they know the password).
@@ -306,7 +315,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     # legacy register form has no verification step and relies on staff approval alone.
     from app.models import EmailOtp
     was_sent_code = db.scalars(select(EmailOtp.id).where(EmailOtp.user_id == user.id)).first()
-    if student_status == "pending" and user.email_verified_at is None and was_sent_code:
+    if student_status == "pending" and user.email_verified_at is None and was_sent_code             and email_code_required(db):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
             "code": "email_unverified",
             "message": "Verify your email address before signing in.",

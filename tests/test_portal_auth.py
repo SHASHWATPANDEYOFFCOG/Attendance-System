@@ -131,7 +131,7 @@ def test_rate_limit_ignores_spoofed_forwarded_for_from_untrusted_peer(monkeypatc
     assert rl.client_ip(Request(scope)) == "1.2.3.4"
 
 
-def test_pending_unverified_signup_cannot_sign_in(api, make_user):
+def test_pending_unverified_signup_cannot_sign_in(api, make_user, email_codes_on):
     from app.db import SessionLocal
     from app.models import StudentProfile
 

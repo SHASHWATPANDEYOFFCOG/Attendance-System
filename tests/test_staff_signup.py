@@ -9,7 +9,7 @@ from tests.test_portal_students import _latest_mail_to
 
 
 @pytest.fixture()
-def open_branches(api, make_user):
+def open_branches(api, make_user, email_codes_on):
     """Default settings: staff registrations need no approval."""
     _, root = make_user("root", role="super_admin")
     cse = api.post("/api/departments", json={"code": "CSE", "name": "Computer Science"}, headers=root).json()["id"]
@@ -176,3 +176,36 @@ def test_the_register_page_is_told_whether_approval_is_needed(api, open_branches
     assert api.get("/api/public/academic-options").json()["policy"]["staff_registration_approval"] is False
     api.patch("/api/admin/settings", json={"staff_registration_approval": True}, headers=open_branches["root"])
     assert api.get("/api/public/academic-options").json()["policy"]["staff_registration_approval"] is True
+
+
+# ------------------------------------------------------ email codes switched off (the default)
+
+@pytest.fixture()
+def no_codes(api, make_user):
+    _, root = make_user("root", role="super_admin")
+    cse = api.post("/api/departments", json={"code": "CSE", "name": "Computer Science"}, headers=root).json()["id"]
+    return {"root": root, "cse": cse}
+
+
+def test_without_email_codes_a_teacher_registers_and_signs_in_immediately(api, no_codes):
+    r = _register(api, no_codes["cse"])
+    assert r.status_code == 201
+    assert r.json()["otp_sent"] is False and r.json()["account"] == "ready"
+    login = _login(api, "new.teacher@college.edu")
+    assert login.status_code == 200 and login.json()["role"] == "faculty"
+
+
+def test_without_email_codes_but_with_approval_the_teacher_still_waits(api, no_codes):
+    api.patch("/api/admin/settings", json={"staff_registration_approval": True}, headers=no_codes["root"])
+    r = _register(api, no_codes["cse"])
+    assert r.json()["otp_sent"] is False and r.json()["account"] == "pending"
+    assert _login(api, "new.teacher@college.edu").json()["detail"]["code"] == "staff_pending"
+
+
+def test_turning_codes_off_releases_people_stuck_waiting_for_one(api, no_codes):
+    api.patch("/api/admin/settings", json={"email_verification_required": True}, headers=no_codes["root"])
+    _register(api, no_codes["cse"])
+    assert _login(api, "new.teacher@college.edu").json()["detail"]["code"] == "email_unverified"
+    api.patch("/api/admin/settings", json={"email_verification_required": False}, headers=no_codes["root"])
+    r = _login(api, "new.teacher@college.edu")
+    assert r.status_code == 200 and r.json()["role"] == "faculty"

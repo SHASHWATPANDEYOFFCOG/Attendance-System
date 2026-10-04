@@ -6,8 +6,8 @@ minimum percentage are your college's actual settings. The defaults are shown he
 ## Students
 
 1. **Register.** Open **/signup**. Fill in your details exactly as in college records, choose
-   your branch, year, batch and section, and add a clear profile photo. Enter the 6-digit code
-   sent to your email.
+   your branch, year, batch and section, and add a clear profile photo. Then sign in. (If your
+   college has switched on email codes, enter the 6-digit code we email you first.)
 2. **Wait for approval.** Your class teacher checks and approves your account. You can sign in
    meanwhile, but cannot mark attendance until approved. If you are rejected, the reason is
    shown: fix your details under **My profile** and resubmit.
@@ -45,9 +45,9 @@ The portal can be installed like an app: browser menu → **Add to Home screen**
 Sign in at **/authority/login** (students use **/login**). You land on the authority dashboard.
 
 No account yet? Use **Register** on the authority sign-in page (**/authority/register**): your
-branch, employee ID and whether you are a teacher or HOD. Confirm your email with the code we
-send; the account works once an administrator approves it (an HOD can approve teachers of their
-own branch; HOD rights are granted by the super admin only).
+branch, employee ID and whether you are a teacher or HOD. By default you can sign in straight
+away with teacher access; HOD rights are granted by the super admin. (Colleges can switch on an
+email code and/or administrator approval under Settings.)
 
 1. **Your classes.** The admin or HOD assigns your subjects and classes and builds the
    timetable. Everywhere — directory, reports, leave, issues — you see only students of your

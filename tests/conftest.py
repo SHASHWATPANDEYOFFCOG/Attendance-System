@@ -155,3 +155,19 @@ def make_session(api):
             db.close()
 
     return _make
+
+
+@pytest.fixture()
+def email_codes_on(api):
+    """Switch the "Email code at registration" setting on (it is off by default)."""
+    from app import settings_service
+    from app.db import SessionLocal
+    from app.runtime import cfg
+
+    db = SessionLocal()
+    try:
+        settings_service.update(db, cfg, {"email_verification_required": True}, actor_id=None)
+        db.commit()
+        settings_service.invalidate()
+    finally:
+        db.close()

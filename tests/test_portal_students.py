@@ -48,7 +48,7 @@ def _latest_mail_to(addr: str):
 
 
 @pytest.fixture()
-def campus(api, make_user):
+def campus(api, make_user, email_codes_on):
     """CSE + ECE branches, a 2023-2027 batch, sections, a term, a teacher per section."""
     admin_id, admin = make_user("root", role="super_admin")
     r = api.post("/api/departments", json={"code": "CSE", "name": "Computer Science"},
@@ -181,6 +181,25 @@ def test_timetable_rejects_double_booking(api, campus):
 
 
 # ------------------------------------------------------------------ registration
+
+def test_without_email_codes_a_student_signs_in_right_after_registering(api, campus):
+    from app import settings_service
+    from app.db import SessionLocal
+    from app.runtime import cfg
+
+    db = SessionLocal()
+    settings_service.update(db, cfg, {"email_verification_required": False}, actor_id=None)
+    db.commit()
+    db.close()
+    settings_service.invalidate()
+
+    r = _signup(api, campus)
+    assert r.status_code == 201 and r.json()["otp_sent"] is False
+    login = _login(api, "asha@college.edu")
+    assert login.status_code == 200 and login.json()["student_status"] == "pending"
+    # Teachers are told straight away, and still have to approve.
+    assert api.get("/api/approvals/summary", headers=campus["teacher_a"]).json()["registrations"] == 1
+
 
 def test_teacher_approval_vouches_for_an_unverified_email(api, campus):
     """The code never arrived (mail provider refusing): the teacher can still approve, which

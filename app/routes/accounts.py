@@ -151,6 +151,32 @@ def issue_otp(db: Session, user: User) -> None:
            f"If you did not sign up, ignore this email.", email=True, sensitive=True)
 
 
+def email_code_required(db: Session) -> bool:
+    from app import settings_service
+    from app.runtime import cfg
+
+    return bool(settings_service.get(db, cfg, "email_verification_required"))
+
+
+def confirm_email(db: Session, user: User) -> Optional[str]:
+    """Mark the address confirmed and run what follows: a staff registration is switched on
+    (or queued for approval), a student registration is announced to their teachers.
+    Returns the staff-specific message, or None for a student."""
+    from app.routes.staff_signup import on_email_verified
+
+    if user.email_verified_at is None:
+        user.email_verified_at = utcnow()
+    staff_message = on_email_verified(db, user)
+    prof = _profile(db, user.id)
+    if prof is not None and prof.status == StudentStatus.PENDING.value:
+        notify(db, responsible_staff(db, prof), "registration_pending",
+               "New student registration",
+               f"{user.display_name} ({prof.roll_number}) registered for "
+               f"{section_label(prof.section) if prof.section else 'your class'} and is waiting "
+               f"for approval.", link="/staff/approvals", email=True)
+    return staff_message
+
+
 # ------------------------------------------------------------------ sign-up
 
 @router.post("/auth/signup", status_code=201)
@@ -211,12 +237,19 @@ async def signup(
         address=data["address"], photo_file_id=pic.id, status=StudentStatus.PENDING.value,
         admission_year=db.get(Batch, batch_id).start_year,
     ))
-    issue_otp(db, user)
     audit(db, user, "student_signup", target_type="user", target_id=user.id,
           detail={"section_id": sec.id, "roll": data["roll_number"]}, request=request)
+    if email_code_required(db):
+        issue_otp(db, user)
+        db.commit()
+        return {"email": user.email, "otp_sent": True,
+                "message": "We emailed you a 6-digit code. Enter it to verify your email."}
+    db.flush()
+    confirm_email(db, user)
     db.commit()
-    return {"email": user.email, "otp_sent": True,
-            "message": "We emailed you a 6-digit code. Enter it to verify your email."}
+    return {"email": user.email, "otp_sent": False,
+            "message": "Registration received. Sign in now; a teacher of your class will approve "
+                       "your account before you can mark attendance."}
 
 
 class VerifyIn(BaseModel):
@@ -250,18 +283,7 @@ def verify_email(body: VerifyIn, request: Request, db: Session = Depends(get_db)
             "message": f"That code is wrong. {left} attempt(s) left." if left else
                        "Too many wrong codes. Request a new one."})
     otp.consumed_at = utcnow()
-    user.email_verified_at = utcnow()
-
-    from app.routes.staff_signup import on_email_verified
-
-    staff_message = on_email_verified(db, user)
-    prof = _profile(db, user.id)
-    if prof is not None and prof.status == StudentStatus.PENDING.value:
-        notify(db, responsible_staff(db, prof), "registration_pending",
-               "New student registration",
-               f"{user.display_name} ({prof.roll_number}) registered for "
-               f"{section_label(prof.section) if prof.section else 'your class'} and is waiting "
-               f"for approval.", link="/staff/approvals", email=True)
+    staff_message = confirm_email(db, user)
     audit(db, user, "email_verified", target_type="user", target_id=user.id, request=request)
     db.commit()
     if staff_message:

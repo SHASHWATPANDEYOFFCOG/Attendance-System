@@ -24,7 +24,7 @@ from app.db import get_db
 from app.models import Department, ReviewStatus, Role, StaffRegistration, User, utcnow
 from app.notify import notify
 from app.ratelimit import enforce
-from app.routes.accounts import _username_for, check_unique, issue_otp
+from app.routes.accounts import _username_for, check_unique, confirm_email, email_code_required, issue_otp
 
 router = APIRouter(prefix="/api", tags=["staff-signup"])
 
@@ -87,13 +87,19 @@ def staff_signup(body: StaffSignupIn, request: Request, db: Session = Depends(ge
     db.add(StaffRegistration(user_id=user.id, requested_role=body.requested_role,
                              department_id=body.department_id, employee_id=employee_id,
                              designation=designation))
-    issue_otp(db, user)
     audit(db, user, "staff_signup", target_type="user", target_id=user.id,
           detail={"requested_role": body.requested_role, "department_id": body.department_id,
                   "employee_id": employee_id}, request=request)
+    if email_code_required(db):
+        issue_otp(db, user)
+        db.commit()
+        return {"email": user.email, "otp_sent": True,
+                "message": "We emailed you a 6-digit code. Enter it to verify your email."}
+    db.flush()
+    message = confirm_email(db, user)
     db.commit()
-    return {"email": user.email, "otp_sent": True,
-            "message": "We emailed you a 6-digit code. Enter it to verify your email."}
+    return {"email": user.email, "otp_sent": False, "account": "ready" if user.is_active else "pending",
+            "message": message}
 
 
 def on_email_verified(db: Session, user: User) -> Optional[str]:

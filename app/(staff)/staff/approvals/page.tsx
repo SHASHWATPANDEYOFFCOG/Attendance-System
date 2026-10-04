@@ -110,7 +110,11 @@ function Registrations({ onChange }: { onChange: () => void }) {
   async function decide(s: Pending, approve: boolean) {
     try {
       if (approve) {
-        if (!(await confirm({ title: `Approve ${s.full_name}?`, confirmLabel: "Approve" }))) return;
+        if (!(await confirm({
+          title: `Approve ${s.full_name}?`, confirmLabel: "Approve",
+          body: s.email_verified ? undefined
+            : "Their email is not verified yet (the code may not have reached them). Approving confirms it, so check the address is really theirs.",
+        }))) return;
         await api.post(`/api/students/${s.id}/approve`);
         toast(`${s.full_name} approved.`);
       } else {
@@ -131,7 +135,7 @@ function Registrations({ onChange }: { onChange: () => void }) {
 
   if (error) return <PageError message={error} retry={load} />;
   if (!rows) return <PageLoading />;
-  if (!rows.length) return <EmptyState title="No registrations waiting">New sign-ups for your classes appear here once they verify their email.</EmptyState>;
+  if (!rows.length) return <EmptyState title="No registrations waiting">New sign-ups for your classes appear here.</EmptyState>;
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {rows.map((s) => (
@@ -147,11 +151,11 @@ function Registrations({ onChange }: { onChange: () => void }) {
               <Link href={`/staff/students/${s.id}`} className="font-semibold text-ink">{s.full_name}</Link>
               <div className="font-mono text-[12px] text-ash">{s.roll_number} · {s.section}</div>
               <div className="truncate text-[12.5px] text-ash">{s.email}</div>
-              {!s.email_verified ? <Pill tone="warn">email not verified</Pill> : null}
+              {!s.email_verified ? <Pill tone="warn">email not verified · approving confirms it</Pill> : null}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => decide(s, true)} disabled={!s.email_verified}>Approve</Button>
+            <Button variant="primary" onClick={() => decide(s, true)}>Approve</Button>
             <Button onClick={() => decide(s, false)}>Reject</Button>
             <Link href={`/staff/students/${s.id}`} className="display self-center px-2 text-[11.5px] text-ink">Full details</Link>
           </div>
@@ -183,7 +187,8 @@ function StaffRequests({ onChange }: { onChange: () => void }) {
         const ok = await confirm({
           title: `Approve ${r.full_name} as ${ROLE_NAME[r.requested_role]}?`,
           body: `${r.department ?? ""} · employee ID ${r.employee_id}. Check this against the staff list before approving: `
-            + "they will be able to see and mark attendance for their classes.",
+            + "they will be able to see and mark attendance for their classes."
+            + (r.email_verified ? "" : " Their email is not verified yet; approving confirms it."),
           confirmLabel: "Approve",
         });
         if (!ok) return;
@@ -208,7 +213,7 @@ function StaffRequests({ onChange }: { onChange: () => void }) {
   if (error) return <PageError message={error} retry={load} />;
   if (!rows) return <PageLoading />;
   if (!rows.length) {
-    return <EmptyState title="No staff requests waiting">Teachers who register at the authority register page appear here once they verify their email.</EmptyState>;
+    return <EmptyState title="No staff requests waiting">Teachers who register at the authority register page appear here.</EmptyState>;
   }
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -227,7 +232,7 @@ function StaffRequests({ onChange }: { onChange: () => void }) {
           </dl>
           {!r.email_verified ? <div className="mt-2"><Pill tone="warn">email not verified</Pill></div> : null}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => decide(r, true)} disabled={!r.email_verified}>Approve</Button>
+            <Button variant="primary" onClick={() => decide(r, true)}>Approve</Button>
             <Button onClick={() => decide(r, false)}>Reject</Button>
           </div>
         </Card>

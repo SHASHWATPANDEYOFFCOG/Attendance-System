@@ -87,7 +87,8 @@ function VerifyForm() {
     <AuthCard title="Verify your email">
       <p className="mt-0 text-[14px] text-ink/85">
         We sent a 6-digit code to <strong>{email || "your email"}</strong>. It expires in 10
-        minutes. Check your spam folder if it has not arrived.
+        minutes. Check your spam folder if it has not arrived. Still nothing? Your teacher (or the
+        administrator, for staff) can approve your registration directly, which confirms your email.
       </p>
       {notice ? <Banner>{notice}</Banner> : null}
       <FormError>{error}</FormError>

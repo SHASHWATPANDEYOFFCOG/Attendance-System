@@ -1210,6 +1210,23 @@ def system_status(db: Session) -> dict:
             "variables." + (" This is a PRODUCTION deployment." if _os.environ.get(
                 "ATTENDANCE_ENV", "").lower() == "production" else "")
         )
+    else:
+        # Configured but bouncing: say so, with the provider's own reason, or codes and approvals
+        # silently never arrive (e.g. Resend's test sender only delivers to the account owner).
+        from datetime import timedelta as _td
+
+        from app.models import Notification
+
+        failing = db.scalars(select(Notification).where(
+            Notification.channel == "email", Notification.sent_at.is_(None),
+            Notification.error.is_not(None),
+            Notification.created_at > utcnow() - _td(hours=24))
+            .order_by(Notification.created_at.desc())).all()
+        if failing:
+            warnings.append(
+                f"EMAIL FAILING — {len(failing)} email(s) in the last 24 hours could not be sent. "
+                f"The mail provider said: {failing[0].error[:220]}. Students and staff waiting for a "
+                f"code can be approved from Approvals instead.")
     warnings.append(
         "THRESHOLDS UNVALIDATED — match/review/dup thresholds are the spec's placeholder values, "
         "not values derived from a ROC curve on enrolled faces. Run tools/roc.py."

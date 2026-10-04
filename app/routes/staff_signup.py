@@ -191,8 +191,9 @@ def decide(reg_id: int, body: DecideIn, request: Request, db: Session = Depends(
     user = db.get(User, reg.user_id)
 
     if body.approve:
-        if user.email_verified_at is None:
-            raise HTTPException(409, "This person has not verified their email yet.")
+        vouched = user.email_verified_at is None
+        if vouched:                    # the approver vouches for the address (see approve_student)
+            user.email_verified_at = utcnow()
         role = body.role or reg.requested_role
         if role not in REQUESTABLE:
             raise HTTPException(422, detail={"field": "role", "message": "Choose Teacher or HOD."})

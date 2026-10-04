@@ -122,11 +122,16 @@ def test_rejection_needs_a_reason_which_the_person_then_sees(api, branches):
     assert "Not on the faculty list" in r.json()["detail"]["message"]
 
 
-def test_cannot_approve_before_email_is_verified(api, branches):
+def test_approving_vouches_for_an_email_whose_code_never_arrived(api, branches):
+    """A bouncing mail provider must not lock a real teacher out: the approver vouches."""
     _register(api, branches["cse"])
+    assert _login(api, "new.teacher@college.edu").json()["detail"]["code"] == "email_unverified"
+    assert api.get("/api/approvals/summary", headers=branches["root"]).json()["staff"] == 1
     reg = api.get("/api/staff-registrations", headers=branches["root"]).json()[0]
+    assert reg["email_verified"] is False
     assert api.post(f"/api/staff-registrations/{reg['id']}/decide", json={"approve": True},
-                    headers=branches["root"]).status_code == 409
+                    headers=branches["root"]).status_code == 200
+    assert _login(api, "new.teacher@college.edu").status_code == 200
 
 
 def test_duplicates_and_bad_input_are_refused_clearly(api, branches):

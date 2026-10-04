@@ -197,15 +197,20 @@ def approve_student(student_id: int, request: Request, db: Session = Depends(get
     user = db.get(User, student_id)
     if prof.status == StudentStatus.APPROVED.value:
         raise HTTPException(409, "This student is already approved.")
-    if user.email and user.email_verified_at is None:
-        raise HTTPException(409, "The student has not verified their email address yet.")
+    # A teacher approving a registration has checked the person against college records, which
+    # vouches for the address too. Without this, a student whose code never arrived (a bouncing
+    # mail provider, a typo-free but filtered inbox) would be locked out for good.
+    vouched = bool(user.email and user.email_verified_at is None)
+    if vouched:
+        user.email_verified_at = utcnow()
     prof.status = StudentStatus.APPROVED.value
     prof.rejection_reason = None
     prof.decided_by_id, prof.decided_at = actor.id, utcnow()
     notify(db, [user.id], "registration_approved", "Registration approved",
            "Your account has been approved. You now have full access, including marking "
            "attendance.", link="/student", email=True)
-    audit(db, actor, "student_approved", target_type="user", target_id=user.id, request=request)
+    audit(db, actor, "student_approved", target_type="user", target_id=user.id, request=request,
+          detail={"email_verified_by_staff": True} if vouched else None)
     db.commit()
     return {"id": user.id, "status": prof.status}
 
@@ -240,8 +245,7 @@ def approvals_summary(db: Session = Depends(get_db), actor: User = Depends(requi
     scope = student_scope_clause(db, actor)
     base = select(func.count()).select_from(StudentProfile).join(
         User, User.id == StudentProfile.user_id).where(User.deleted_at.is_(None), scope)
-    pending_students = db.scalar(base.where(StudentProfile.status == "pending",
-                                            User.email_verified_at.is_not(None))) or 0
+    pending_students = db.scalar(base.where(StudentProfile.status == "pending")) or 0
     edit_requests = db.scalar(
         select(func.count()).select_from(ProfileEditRequest)
         .join(StudentProfile, StudentProfile.user_id == ProfileEditRequest.user_id)
@@ -261,7 +265,7 @@ def approvals_summary(db: Session = Depends(get_db), actor: User = Depends(requi
 
         staff = db.scalar(select(func.count()).select_from(
             scoped_registrations(db, actor).join(User, User.id == StaffRegistration.user_id)
-            .where(StaffRegistration.status == "pending", User.email_verified_at.is_not(None))
+            .where(StaffRegistration.status == "pending")
             .subquery())) or 0
     return {"registrations": pending_students, "edit_requests": edit_requests,
             "face_enrollments": faces, "reenroll_requests": reenroll, "staff": staff,

@@ -182,6 +182,33 @@ def test_timetable_rejects_double_booking(api, campus):
 
 # ------------------------------------------------------------------ registration
 
+def test_teacher_approval_vouches_for_an_unverified_email(api, campus):
+    """The code never arrived (mail provider refusing): the teacher can still approve, which
+    verifies the address, and the student can then sign in."""
+    assert _signup(api, campus).status_code == 201
+    assert _login(api, "asha@college.edu").json()["detail"]["code"] == "email_unverified"
+    assert api.get("/api/approvals/summary", headers=campus["admin"]).json()["registrations"] == 1
+    sid = api.get("/api/students?status=pending", headers=campus["admin"]).json()["rows"][0]["id"]
+    assert api.post(f"/api/students/{sid}/approve", headers=campus["admin"]).status_code == 200
+    r = _login(api, "asha@college.edu")
+    assert r.status_code == 200 and r.json()["student_status"] == "approved"
+
+
+def test_system_status_reports_a_bouncing_mail_provider(api, campus, monkeypatch):
+    from app.db import SessionLocal
+    from app.models import Notification, User
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
+    db = SessionLocal()
+    uid = db.query(User).first().id
+    db.add(Notification(user_id=uid, type="verify_email", payload="{}", channel="email",
+                        error="SMTPDataError: (550, b'You can only send testing emails to your own email address')"))
+    db.commit()
+    db.close()
+    warnings = api.get("/api/system/status", headers=campus["admin"]).json()["warnings"]
+    assert any(w.startswith("EMAIL FAILING") and "only send testing emails" in w for w in warnings)
+
+
 def test_signup_verify_pending_then_teacher_approves(api, campus):
     r = _signup(api, campus)
     assert r.status_code == 201, r.text

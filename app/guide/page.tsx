@@ -95,9 +95,11 @@ export default async function GuidePage() {
               / O / E to mark anyone by hand. Changing a mark that is already recorded asks for a reason — it goes to the audit
               log and to the student. At the end time everyone unmarked becomes Absent (or On leave if covered by approved leave).
             </Step>
-            <Step n={4} title="Cameras">
-              Classroom cameras mark students they are confident about. Near matches wait in <em>Camera review</em> with a face
-              crop next to the profile photo — accept or reject. If a camera goes offline during your lecture you are notified.
+            <Step n={4} title="Tablet photo and cameras">
+              In a live lecture, <strong>Tablet photo</strong> lets you photograph the class with a tablet or phone: recognised
+              students are ticked for you, you check the list and confirm. Photos are not saved. <strong>Classroom camera</strong>
+              connects any registered CCTV camera to the lecture, with a preview of what it sees; it then marks students it is
+              confident about by itself. Near matches wait in <em>Camera review</em>. If a camera goes offline you are notified.
             </Step>
             <Step n={5} title="Leave, issues, messages, notices">
               Approve leave (approved leave also corrects absences already recorded), answer issues, message one student, a class

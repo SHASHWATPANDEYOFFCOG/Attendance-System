@@ -12,7 +12,19 @@ import { EmptyState, PageError, PageLoading } from "@/components/states";
 import { useUi } from "@/components/toast";
 
 type Row = { record_id: number; date: string; time: string; subject: string; status: string; method: string; note: string };
-type Payload = { rows: Row[]; subjects: { id: number; label: string }[]; meta: { page: number; total: number; pages: number } };
+type Payload = {
+  rows: Row[]; subjects: { id: number; label: string }[]; totals?: Record<string, number>;
+  meta: { page: number; total: number; pages: number };
+};
+
+const SUMMARY = [
+  ["present", "Present", "var(--status-present)"], ["late", "Late", "var(--status-late)"],
+  ["absent", "Absent", "var(--status-absent)"], ["on_leave", "On leave", "var(--status-leave)"],
+  ["excused", "Excused", "var(--ash)"],
+] as const;
+
+const monthLabel = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString([], { month: "long", year: "numeric" });
 
 const STATUSES = ["present", "late", "absent", "on_leave", "excused", "on_duty"];
 
@@ -107,16 +119,32 @@ function History() {
       {error ? <PageError message={error} retry={load} /> : !data ? <PageLoading /> : !data.rows.length ? (
         <EmptyState title="No lectures match">Try a different month or clear the filters.</EmptyState>
       ) : (
+        <>
+        {data.totals ? (
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Totals for the lectures shown">
+            {SUMMARY.filter(([k]) => k === "present" || k === "late" || k === "absent" || (data.totals?.[k] ?? 0) > 0).map(([k, label, col]) => (
+              <div key={k} className="rounded-[3px] border border-rule bg-card py-2 text-center shadow-card">
+                <div className="label text-[10.5px]">{label}</div>
+                <div className="font-mono text-[22px] font-semibold tnum" style={{ color: col }}>{data.totals?.[k] ?? 0}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <Card>
           <ul className="m-0 list-none p-0 md:hidden">
-            {data.rows.map((r) => (
-              <li key={r.record_id} className="flex items-start justify-between gap-3 border-b border-rule py-2.5 last:border-0">
+            {data.rows.map((r, i) => (
+              <li key={r.record_id}>
+              {i === 0 || data.rows[i - 1].date.slice(0, 7) !== r.date.slice(0, 7) ? (
+                <div className="label sticky top-[52px] z-[1] -mx-1 mt-2 bg-card px-1 py-1.5 text-[11px] first:mt-0">{monthLabel(r.date)}</div>
+              ) : null}
+              <div className="flex items-start justify-between gap-3 border-b border-rule py-2.5">
                 <div className="min-w-0">
                   <div className="font-mono text-[12px] text-ash">{r.date} · {r.time}</div>
                   <div className="text-[14px] font-semibold">{r.subject}</div>
                   <div className="text-[12.5px] text-ash">{r.method}{r.note ? ` — ${r.note}` : ""}</div>
                 </div>
                 <Mark status={r.status} />
+              </div>
               </li>
             ))}
           </ul>
@@ -130,7 +158,12 @@ function History() {
                 </tr>
               </thead>
               <tbody>
-                {data.rows.map((r) => (
+                {data.rows.map((r, i) => [
+                  i === 0 || data.rows[i - 1].date.slice(0, 7) !== r.date.slice(0, 7) ? (
+                    <tr key={`m-${r.date.slice(0, 7)}`}>
+                      <td colSpan={6} className="label border-b border-rule bg-tint px-2 py-1.5 text-[11px]">{monthLabel(r.date)}</td>
+                    </tr>
+                  ) : null,
                   <tr key={r.record_id} className="hover:bg-tint">
                     <td className="border-b border-rule px-2 py-1.5 font-mono tnum">{r.date}</td>
                     <td className="border-b border-rule px-2 font-mono tnum">{r.time}</td>
@@ -138,8 +171,8 @@ function History() {
                     <td className="border-b border-rule px-2"><span className="inline-flex items-center gap-1.5"><Mark status={r.status} />{r.status.replace("_", " ")}</span></td>
                     <td className="border-b border-rule px-2 text-ash">{r.method}</td>
                     <td className="border-b border-rule px-2 text-ash">{r.note}</td>
-                  </tr>
-                ))}
+                  </tr>,
+                ])}
               </tbody>
             </table>
           </div>
@@ -151,6 +184,7 @@ function History() {
             </nav>
           ) : null}
         </Card>
+        </>
       )}
     </Page>
   );

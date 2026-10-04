@@ -52,7 +52,10 @@ function classify(err: unknown): CameraFailure {
   return "denied";
 }
 
-export function useCamera() {
+/** `facing: "environment"` uses the back camera (a teacher's tablet photographing the class). */
+export function useCamera({ facing = "user", width = 960, height = 720 }: {
+  facing?: "user" | "environment"; width?: number; height?: number;
+} = {}) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const [ready, setReady] = useState(false);
@@ -64,7 +67,7 @@ export function useCamera() {
     if (!navigator.mediaDevices?.getUserMedia) return setFailure("unsupported");
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } },
+        video: { facingMode: facing, width: { ideal: width }, height: { ideal: height } },
         audio: false,
       });
       stream.current = s;
@@ -77,7 +80,7 @@ export function useCamera() {
     } catch (e) {
       setFailure(classify(e));
     }
-  }, []);
+  }, [facing, width, height]);
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop());

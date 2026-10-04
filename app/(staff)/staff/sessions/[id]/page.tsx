@@ -16,6 +16,7 @@ import { Banner, Card, CardHeader, Mark, Pill } from "@/components/ui";
 import { Button } from "@/components/forms";
 import { PageError, PageLoading } from "@/components/states";
 import { useUi } from "@/components/toast";
+import { ClassCamera, TabletPhoto } from "@/components/class-attendance";
 
 type Row = {
   user_id: number; display_name: string; roll_number: string | null; record_id: number | null;
@@ -33,7 +34,7 @@ type Live = {
 const QUICK = [
   ["present", "P"], ["late", "L"], ["absent", "A"], ["on_leave", "O"], ["excused", "E"],
 ] as const;
-const METHOD: Record<string, string> = { cctv: "camera", face: "camera", mobile: "selfie", qr: "QR", manual: "teacher", system: "auto" };
+const METHOD: Record<string, string> = { cctv: "camera", face: "camera", mobile: "selfie", qr: "QR", manual: "teacher", system: "auto", photo: "tablet photo" };
 
 export default function LiveSessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -171,6 +172,11 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
             <div className="font-mono text-[24px] font-semibold tnum" style={{ color: col }}>{v}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <TabletPhoto sessionId={Number(sid)} live={data.state === "active"} onMarked={load} />
+        <ClassCamera sessionId={Number(sid)} live={data.state === "active"} />
       </div>
 
       <Card>

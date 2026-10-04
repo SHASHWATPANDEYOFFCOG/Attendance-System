@@ -27,6 +27,7 @@ const ALLOWED = [
   /^api\/reports\/[a-z-]+(\/\d+)?$/,
   /^api\/sessions(\/\d+(\/[a-z-]+(\/\d+(\/[a-z]+)?)?)?)?$/,
   /^api\/sessions\/(live|open)$/,
+  /^api\/sessions\/\d+\/(class-photo(\/confirm)?|camera(\/preview)?)$/,
   /^api\/live\/stream$/,
   /^api\/me(\/[a-z-]+(\/[a-z-]+)?(\/\d+)?)?$/,
   /^api\/(departments|programs|batches|sections|subjects|rooms|holidays|terms|assignments|timetable)(\/\d+)?$/,

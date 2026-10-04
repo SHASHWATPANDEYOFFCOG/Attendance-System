@@ -115,7 +115,15 @@ export default function SessionsPage() {
                   {!s && p.slot_id && !p.holiday ? (
                     <Button variant="primary" busy={busy === `slot-${p.slot_id}`} onClick={() => startSlot(p)}>Start session</Button>
                   ) : null}
-                  {s ? <Link href={`/staff/sessions/${s.id}`} className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Live view</Link> : null}
+                  {s ? (
+                    <Link href={`/staff/sessions/${s.id}`}
+                          className="display rounded-[3px] border px-3.5 py-2 text-[12px] no-underline"
+                          style={s.state === "active"
+                            ? { background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }
+                            : { borderColor: "var(--ink)", color: "var(--ink)" }}>
+                      {s.state === "active" ? "Take attendance" : "Open"}
+                    </Link>
+                  ) : null}
                   {s?.state === "active" ? (
                     <>
                       <Link href={`/present/${s.id}`} target="_blank" className="display rounded-[3px] border border-ink px-3.5 py-2 text-[12px] text-ink no-underline hover:bg-tint">Show QR full-screen</Link>

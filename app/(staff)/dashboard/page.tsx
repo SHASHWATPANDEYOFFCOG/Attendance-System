@@ -23,6 +23,15 @@ import { Banner, Card, CardHeader, Empty, Pill, StatTile } from "@/components/ui
 
 export const dynamic = "force-dynamic";
 
+const ROLE_NAME: Record<string, string> = { faculty: "Teacher", admin: "HOD", super_admin: "Administrator" };
+
+function warningTitle(w: string): string {
+  if (/ANTI-SPOOF/i.test(w)) return "Anti-spoofing";
+  if (/CLOCK/i.test(w)) return "Server clock";
+  if (/EMAIL/i.test(w)) return "Email";
+  return "Face thresholds";
+}
+
 type Counts = { roster: number; present: number; late: number; absent: number; on_leave: number; unmarked: number };
 type LivePayload = {
   periods: { slot_id: number | null; subject_code: string | null; subject_name: string | null; start_time: string;
@@ -68,6 +77,7 @@ export default async function DashboardPage() {
   const today = safe(TimetableTodaySchema, raw.today);
 
   const warnings = me?.system?.warnings ?? [];
+  const isAdmin = me?.role === "admin" || me?.role === "super_admin";
   const unmarked = today?.periods.filter((p) => !p.marked).length ?? 0;
 
   return (
@@ -76,8 +86,8 @@ export default async function DashboardPage() {
         <div>
           <h1 className="display m-0 text-[26px]">Authority dashboard</h1>
           <p className="mt-0.5 font-mono text-xs text-ash">
-            {me ? `${me.user.display_name} · ${me.role.replace("_", " ")}` : "loading"}
-            {me ? ` · ${me.timezone} · stored UTC` : ""}
+            {me ? `${me.user.display_name} · ${ROLE_NAME[me.role] ?? me.role} · ` : ""}
+            {new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", timeZone: me?.timezone })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -102,7 +112,7 @@ export default async function DashboardPage() {
             <table className="w-full min-w-[620px] border-collapse text-[13.5px]">
               <thead>
                 <tr>
-                  {["Time", "Subject", "Class", "State", "Present", "Late", "Absent", "Leave", "Unmarked"].map((h) => (
+                  {["Time", "Subject", "Class", "State", "Present", "Late", "Absent", "Leave", "Unmarked", ""].map((h) => (
                     <th key={h} className="label border-b-2 border-ink px-2 pb-1.5 text-left">{h}</th>
                   ))}
                 </tr>
@@ -123,6 +133,17 @@ export default async function DashboardPage() {
                       {(["present", "late", "absent", "on_leave", "unmarked"] as const).map((k) => (
                         <td key={k} className="border-b border-rule px-2 font-mono tnum">{c ? c[k] : "—"}</td>
                       ))}
+                      <td className="border-b border-rule px-2 py-1 text-right">
+                        {p.session && p.session.state !== "closed" ? (
+                          <Link href={`/staff/sessions/${p.session.id}`}
+                                className="display inline-block whitespace-nowrap rounded-[3px] border px-2.5 py-1.5 text-[11px] no-underline"
+                                style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}>
+                            {p.session.state === "active" ? "Take attendance" : "Open"}
+                          </Link>
+                        ) : p.session ? (
+                          <Link href={`/staff/sessions/${p.session.id}`} className="text-[12px] text-ink">View</Link>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
@@ -156,14 +177,29 @@ export default async function DashboardPage() {
         </Card>
       ) : null}
 
-      {warnings.map((w) => (
-        <Banner key={w} bad={/ANTI-SPOOF/i.test(w)}>
-          <strong className="label mb-0.5 block text-[12px]">
-            {/ANTI-SPOOF/i.test(w) ? "Anti-spoofing" : /CLOCK/i.test(w) ? "Host clock" : /EMAIL/i.test(w) ? "Email" : "Thresholds"}
-          </strong>
-          {w}
-        </Banner>
-      ))}
+      {/* Server housekeeping is for whoever runs the system, not for every teacher. */}
+      {isAdmin && warnings.length ? (
+        <details className="mb-4 rounded-[3px] border border-rule bg-card shadow-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <span className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: warnings.some((w) => /ANTI-SPOOF|EMAIL FAILING/i.test(w)) ? "var(--oxide)" : "var(--amber)" }} aria-hidden />
+              <span className="label text-[12px]">System health</span>
+              <span className="text-[13px] text-ash">
+                {warnings.length} item{warnings.length === 1 ? "" : "s"} need attention: {warnings.map(warningTitle).join(", ")}
+              </span>
+            </span>
+            <span className="display text-[11px] text-ash">details</span>
+          </summary>
+          <div className="grid gap-2 border-t border-rule px-4 py-3">
+            {warnings.map((w) => (
+              <Banner key={w} bad={/ANTI-SPOOF|EMAIL FAILING/i.test(w)}>
+                <strong className="label mb-0.5 block text-[12px]">{warningTitle(w)}</strong>
+                {w}
+              </Banner>
+            ))}
+          </div>
+        </details>
+      ) : null}
 
       {/* ---------------------------------------------------------- stat row */}
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -205,36 +241,6 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-4">
-          {/* --------------------------------------------------- today */}
-          <Card ruled>
-            <CardHeader title="Today" meta={today?.date} />
-            {today && today.periods.length ? (
-              <ul className="m-0 list-none p-0">
-                {today.periods.map((p) => (
-                  <li
-                    key={p.slot_id}
-                    className="flex items-center justify-between gap-2 border-b border-dashed border-rule py-2 last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <span className="font-mono text-[13px] tnum text-ash">{p.start_time}</span>{" "}
-                      <strong className="text-[14px]">{p.subject_code}</strong>{" "}
-                      <span className="text-ash text-[13px]">
-                        {p.section_label} · {p.room}
-                      </span>
-                    </div>
-                    {p.marked ? (
-                      <Pill tone="ok">marked</Pill>
-                    ) : (
-                      <Pill tone="warn">not marked</Pill>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Empty>No periods scheduled today.</Empty>
-            )}
-          </Card>
-
           {/* ---------------------------------------------- defaulters */}
           <Card>
             <CardHeader

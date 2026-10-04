@@ -51,6 +51,12 @@ SPECS: Dict[str, Spec] = {
     "org_name": Spec("str", _cfg("attendance.organisation", "Attendance Register"),
                      "College / institute name", "Printed on every report and email.",
                      group="general"),
+    "staff_registration_approval": Spec(
+        "bool", _const(False), "Staff registrations need approval",
+        "Off: a teacher who registers at /authority/register can sign in as soon as their email "
+        "is verified (anyone who knows the address can then see their branch's students). On: an "
+        "administrator or HOD approves each request first. HOD rights are never self-granted.",
+        group="general"),
     "min_attendance_pct": Spec("float", _cfg("attendance.minimum_attendance_pct", 75.0),
                                "Minimum attendance %", min=0, max=100, group="policy"),
     "present_window_min": Spec("int", _const(10), "Present window (minutes after start)",

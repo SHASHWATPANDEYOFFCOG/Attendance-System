@@ -98,11 +98,38 @@ def staff_signup(body: StaffSignupIn, request: Request, db: Session = Depends(ge
 
 def on_email_verified(db: Session, user: User) -> Optional[str]:
     """Called by the email-verification endpoint. Returns the message to show, or None when
-    this is not a staff registration."""
+    this is not a staff registration.
+
+    With the `staff_registration_approval` setting off, a verified email is enough: the account
+    is switched on as a Teacher. Asking for HOD does not grant it; a super admin gives HOD
+    rights under Staff & roles.
+    """
+    from app import settings_service
+    from app.runtime import cfg
+
     reg = registration_for(db, user.id)
     if reg is None or reg.status != ReviewStatus.PENDING.value:
         return None
     dept = db.get(Department, reg.department_id)
+    if not settings_service.get(db, cfg, "staff_registration_approval"):
+        user.is_active = True
+        user.role = Role.FACULTY
+        user.department_id = reg.department_id
+        reg.status = ReviewStatus.APPROVED.value
+        reg.decided_at = utcnow()
+        audit(db, user, "staff_registration_auto_approved", target_type="user", target_id=user.id,
+              detail={"requested_role": reg.requested_role, "granted_role": "faculty"})
+        hod_note = (" They asked for HOD rights; give them under Staff & roles if appropriate."
+                    if reg.requested_role == "admin" else "")
+        notify(db, staff_approvers(db, reg.department_id, "admin"), "staff_registered",
+               "New teacher registered",
+               f"{user.display_name} ({reg.employee_id}) registered as a teacher in "
+               f"{dept.code if dept else 'a branch'} and can now sign in.{hod_note}",
+               link="/staff/admin/users", email=True)
+        if reg.requested_role == "admin":
+            return ("Email verified. Your teacher account is ready: sign in now. HOD rights are "
+                    "given by the administrator.")
+        return "Email verified. Your account is ready: sign in now."
     notify(db, staff_approvers(db, reg.department_id, reg.requested_role), "staff_registration",
            "New staff registration",
            f"{user.display_name} ({reg.employee_id}) asked for a {REQUESTABLE[reg.requested_role]} "

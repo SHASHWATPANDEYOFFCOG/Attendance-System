@@ -9,13 +9,23 @@ from tests.test_portal_students import _latest_mail_to
 
 
 @pytest.fixture()
-def branches(api, make_user):
+def open_branches(api, make_user):
+    """Default settings: staff registrations need no approval."""
     _, root = make_user("root", role="super_admin")
     cse = api.post("/api/departments", json={"code": "CSE", "name": "Computer Science"}, headers=root).json()["id"]
     ece = api.post("/api/departments", json={"code": "ECE", "name": "Electronics"}, headers=root).json()["id"]
     _, hod = make_user("hod.cse", role="admin", department_id=cse)
     _, teacher = make_user("t.cse", role="faculty", department_id=cse)
     return {"root": root, "hod": hod, "teacher": teacher, "cse": cse, "ece": ece}
+
+
+@pytest.fixture()
+def branches(api, open_branches):
+    """The "Staff registrations need approval" setting switched on."""
+    r = api.patch("/api/admin/settings", json={"staff_registration_approval": True},
+                  headers=open_branches["root"])
+    assert r.status_code == 200, r.text
+    return open_branches
 
 
 def _register(api, dept, *, email="new.teacher@college.edu", role="faculty", emp="EMP-100",
@@ -129,3 +139,35 @@ def test_duplicates_and_bad_input_are_refused_clearly(api, branches):
     assert r.status_code == 422 and r.json()["detail"]["field"] == "requested_role"
     r = _register(api, 9999, email="y@college.edu", mobile="9811100002", emp="E3")
     assert r.status_code == 422 and r.json()["detail"]["field"] == "department_id"
+
+
+# ------------------------------------------------- approval switched off (the default)
+
+def test_by_default_a_verified_teacher_can_sign_in_at_once(api, open_branches):
+    assert _register(api, open_branches["cse"]).status_code == 201
+    # The email code is still required.
+    assert _login(api, "new.teacher@college.edu").json()["detail"]["code"] == "email_unverified"
+    v = _verify(api, "new.teacher@college.edu")
+    assert "ready" in v["message"] and v["portal"] == "authority"
+    r = _login(api, "new.teacher@college.edu")
+    assert r.status_code == 200 and r.json()["role"] == "faculty"
+    # A colleague now, and nothing left to approve.
+    emails = [u["email"] for u in api.get("/api/admin/users", headers=open_branches["root"]).json()]
+    assert "new.teacher@college.edu" in emails
+    assert api.get("/api/staff-registrations", headers=open_branches["root"]).json() == []
+
+
+def test_asking_for_hod_without_approval_only_grants_teacher(api, open_branches):
+    _register(api, open_branches["cse"], role="admin")
+    v = _verify(api, "new.teacher@college.edu")
+    assert "HOD rights" in v["message"]
+    assert _login(api, "new.teacher@college.edu").json()["role"] == "faculty"
+    # And the self-registered teacher cannot reach admin-only endpoints.
+    tok = _login(api, "new.teacher@college.edu").json()["access_token"]
+    assert api.get("/api/staff-registrations", headers={"Authorization": f"Bearer {tok}"}).status_code == 403
+
+
+def test_the_register_page_is_told_whether_approval_is_needed(api, open_branches):
+    assert api.get("/api/public/academic-options").json()["policy"]["staff_registration_approval"] is False
+    api.patch("/api/admin/settings", json={"staff_registration_approval": True}, headers=open_branches["root"])
+    assert api.get("/api/public/academic-options").json()["policy"]["staff_registration_approval"] is True

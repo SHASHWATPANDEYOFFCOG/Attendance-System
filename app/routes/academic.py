@@ -1043,7 +1043,8 @@ def academic_options(db: Session = Depends(get_db)):
                       "thumbnail_days": s_all["thumbnail_retention_days"]},
         "policy": {"present_window_min": s_all["present_window_min"],
                    "late_window_min": s_all["late_window_min"],
-                   "min_attendance_pct": s_all["min_attendance_pct"]},
+                   "min_attendance_pct": s_all["min_attendance_pct"],
+                   "staff_registration_approval": s_all["staff_registration_approval"]},
         "departments": [{"id": d.id, "code": d.code, "name": d.name,
                          "years": int(max_years.get(d.id) or 4)}
                         for d in db.scalars(select(Department).order_by(Department.code))],

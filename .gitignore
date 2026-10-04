@@ -49,5 +49,4 @@ Thumbs.db
 *.log
 
 # Separate projects / repos living in this folder
-/web-next/
 /axon-landing/

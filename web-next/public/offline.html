@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Offline · Attendance Register</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+           font: 15px/1.5 system-ui, sans-serif; background: #F4F5F0; color: #16304F; }
+    @media (prefers-color-scheme: dark) { body { background: #11161D; color: #E6EBF2; } }
+    main { max-width: 420px; text-align: center; }
+    h1 { font-size: 22px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 8px; }
+    button { font: inherit; padding: 10px 18px; border-radius: 3px; border: 1px solid currentColor;
+             background: transparent; color: inherit; cursor: pointer; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>You are offline</h1>
+    <p>The attendance portal needs a connection — marking attendance is always checked live by the server.
+       Reconnect to Wi-Fi or mobile data and try again.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+</body>
+</html>

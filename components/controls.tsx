@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-export function LogoutButton() {
+export function LogoutButton({ to = "/login" }: { to?: string }) {
   const router = useRouter();
   return (
     <button
       type="button"
       onClick={async () => {
         await fetch("/api/auth/logout", { method: "POST" });
-        router.push("/login");
+        router.push(to);
         router.refresh();
       }}
       className="display cursor-pointer rounded-[3px] border border-ink bg-transparent px-3.5 py-2 text-[12px] text-ink hover:bg-tint"

@@ -20,6 +20,7 @@ const API_BASE = process.env.ATTENDANCE_API_BASE ?? "http://127.0.0.1:8079";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/authority/login",
   "/signup",
   "/verify-email",
   "/forgot-password",
@@ -67,7 +68,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.json({ detail: "not authenticated" }, { status: 401 });
     }
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    // Staff pages send a signed-out visitor to the authority sign in, everything else to the student one.
+    const staffArea = ["/dashboard", "/staff", "/mark", "/reports", "/present", "/authority"]
+      .some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    url.pathname = staffArea ? "/authority/login" : "/login";
     url.search = "";
     url.searchParams.set("next", pathname + request.nextUrl.search);
     const res = NextResponse.redirect(url);

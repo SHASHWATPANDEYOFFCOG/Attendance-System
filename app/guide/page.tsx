@@ -81,7 +81,8 @@ export default async function GuidePage() {
           <h2 id="teachers" className="display m-0 mb-3 text-[20px]">For teachers</h2>
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Your classes">
-              The admin or HOD assigns you subjects and classes and builds the timetable (Setup). You see only students of
+              Sign in at <Link href="/authority/login" className="underline">Authority sign in</Link>; you land on the
+              authority dashboard. The admin or HOD assigns you subjects and classes and builds the timetable (Setup). You see only students of
               your classes — everywhere: directory, reports, leave, issues.
             </Step>
             <Step n={2} title="Approvals">
@@ -109,7 +110,7 @@ export default async function GuidePage() {
           </ol>
         </section>
         <p className="m-0 text-center text-[13px] text-ash">
-          <Link href="/privacy" className="text-ink underline">Privacy policy</Link> · <Link href="/login" className="text-ink underline">Sign in</Link>
+          <Link href="/privacy" className="text-ink underline">Privacy policy</Link> · <Link href="/login" className="text-ink underline">Student sign in</Link> · <Link href="/authority/login" className="text-ink underline">Authority sign in</Link>
         </p>
       </div>
     </PublicShell>

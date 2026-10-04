@@ -77,7 +77,7 @@ export function AppShell({
           <div className="flex items-center gap-2">
             {topRight}
             <ThemeToggle />
-            <LogoutButton />
+            <LogoutButton to={me.role === "student" || me.role === "parent" ? "/login" : "/authority/login"} />
           </div>
         </div>
         <div id="content" className="min-w-0 flex-1">

@@ -74,7 +74,7 @@ export default async function DashboardPage() {
     <main className="relative z-[1] mx-auto max-w-[1240px] px-4 pb-16 pt-6 md:px-5">
       <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-3">
         <div>
-          <h1 className="display m-0 text-[26px]">Attendance Register</h1>
+          <h1 className="display m-0 text-[26px]">Authority dashboard</h1>
           <p className="mt-0.5 font-mono text-xs text-ash">
             {me ? `${me.user.display_name} · ${me.role.replace("_", " ")}` : "loading"}
             {me ? ` · ${me.timezone} · stored UTC` : ""}

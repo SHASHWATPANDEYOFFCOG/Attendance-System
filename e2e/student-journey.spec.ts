@@ -61,7 +61,7 @@ test("a student registers, verifies email, is approved and reaches the dashboard
   // ---- staff approves from the Approvals page
   const staffCtx = await browser.newContext();
   const staff = await staffCtx.newPage();
-  await signIn(staff, ADMIN.username, ADMIN.password);
+  await signIn(staff, ADMIN.username, ADMIN.password, "authority");
   await staff.goto("/staff/approvals");
   const card = staff.locator("li, article, section").filter({ hasText: name }).last();
   await card.getByRole("button", { name: "Approve" }).click();

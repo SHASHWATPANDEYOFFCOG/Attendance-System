@@ -141,13 +141,16 @@ export async function approvedStudent(admin: APIRequestContext, s: Structure, ta
   return { email, password };
 }
 
-export async function signIn(page: Page, username: string, password: string) {
-  await page.goto("/login");
+/** Sign in through the student door (/login) or the staff one (/authority/login). */
+export async function signIn(page: Page, username: string, password: string,
+                             door: "student" | "authority" = "student") {
+  const path = door === "authority" ? "/authority/login" : "/login";
+  await page.goto(path);
   await page.waitForLoadState("networkidle");
-  await page.getByLabel("Username, email or roll number").fill(username);
+  await page.locator("#username").fill(username);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await page.waitForURL((u) => u.pathname !== path);
 }
 
 /** True when nothing on the page is wider than the viewport (no sideways scrolling on a phone). */

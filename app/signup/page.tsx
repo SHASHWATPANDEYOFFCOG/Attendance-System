@@ -119,6 +119,22 @@ export default function SignupPage() {
   useEffect(() => headingRef.current?.focus(), [step]);
 
   const dept = opts?.departments.find((d) => String(d.id) === form.department_id);
+  // Each dropdown offers only what exists further down: a year with no class group in this
+  // branch, or a batch with none in this branch and year, would lead to an empty Section list.
+  const branchSections = useMemo(
+    () => (opts?.sections ?? []).filter((s) => String(s.department_id) === form.department_id),
+    [opts, form.department_id],
+  );
+  const years = useMemo(
+    () => [...new Set(branchSections.map((s) => s.year))].sort((a, b) => a - b),
+    [branchSections],
+  );
+  const batches = useMemo(() => {
+    const inYear = branchSections.filter((s) => String(s.year) === form.year);
+    if (inYear.some((s) => s.batch_id === null)) return opts?.batches ?? [];
+    const ids = new Set(inYear.map((s) => String(s.batch_id)));
+    return (opts?.batches ?? []).filter((b) => ids.has(String(b.id)));
+  }, [opts, branchSections, form.year]);
   const sections = useMemo(
     () =>
       (opts?.sections ?? []).filter(
@@ -130,6 +146,13 @@ export default function SignupPage() {
     [opts, form.department_id, form.year, form.batch_id],
   );
 
+  // One class group for this branch, year and batch: choose it rather than make the student.
+  useEffect(() => {
+    if (sections.length === 1 && form.section_id !== String(sections[0].id)) {
+      setForm((f) => ({ ...f, section_id: String(sections[0].id) }));
+    }
+  }, [sections, form.section_id]);
+
   const set = (k: keyof Form) => (e: { target: { value: string } }) => {
     const v = e.target.value;
     setForm((f) => {
@@ -137,6 +160,7 @@ export default function SignupPage() {
       // Changing the branch, year or batch invalidates the chosen section.
       if (k === "department_id" || k === "year" || k === "batch_id") next.section_id = "";
       if (k === "department_id") next.year = "";
+      if (k === "department_id" || k === "year") next.batch_id = "";
       return next;
     });
     if (errors[k]) setErrors(({ [k]: _drop, ...rest }) => rest);
@@ -233,6 +257,12 @@ export default function SignupPage() {
                   office.
                 </FormError>
               ) : null}
+              {dept && years.length === 0 ? (
+                <FormError>
+                  No classes have been set up for {dept.code} yet, so you cannot register in it. Ask
+                  your college office or HOD.
+                </FormError>
+              ) : null}
               <div className="grid gap-3.5 sm:grid-cols-2">
                 <SelectField label="Branch" required value={form.department_id}
                              onChange={set("department_id")} error={errors.department_id}>
@@ -244,22 +274,20 @@ export default function SignupPage() {
                 <SelectField label="Year" required value={form.year} onChange={set("year")}
                              error={errors.year} disabled={!dept}>
                   <option value="">Select…</option>
-                  {Array.from({ length: dept?.years ?? 4 }, (_, i) => i + 1).map((y) => (
+                  {years.map((y) => (
                     <option key={y} value={y}>Year {y}</option>
                   ))}
                 </SelectField>
                 <SelectField label="Batch" required value={form.batch_id} onChange={set("batch_id")}
-                             error={errors.batch_id}>
+                             error={errors.batch_id} disabled={!form.year}>
                   <option value="">Select…</option>
-                  {opts?.batches.map((b) => (
+                  {batches.map((b) => (
                     <option key={b.id} value={b.id}>{b.label}</option>
                   ))}
                 </SelectField>
                 <SelectField label="Section" required value={form.section_id}
                              onChange={set("section_id")} error={errors.section_id}
-                             disabled={!form.department_id || !form.year || !form.batch_id}
-                             hint={form.department_id && form.year && form.batch_id && sections.length === 0
-                               ? "No sections exist for this combination yet." : undefined}>
+                             disabled={!form.department_id || !form.year || !form.batch_id}>
                   <option value="">Select…</option>
                   {sections.map((s) => (
                     <option key={s.id} value={s.id}>Section {s.name}</option>

@@ -38,7 +38,7 @@ test("public pages", async ({ page }) => {
 
 test("staff pages", async ({ page }) => {
   const errors = watchErrors(page);
-  await signIn(page, ADMIN.username, ADMIN.password);
+  await signIn(page, ADMIN.username, ADMIN.password, "authority");
   for (const path of STAFF) {
     const res = await page.goto(path);
     expect(res?.status(), path).toBeLessThan(400);

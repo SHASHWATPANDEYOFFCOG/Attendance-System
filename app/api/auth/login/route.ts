@@ -10,15 +10,17 @@ import { NextResponse } from "next/server";
 import { API_BASE } from "@/lib/api";
 import { homeFor, setSessionCookies } from "@/lib/session";
 
+const STAFF = new Set(["faculty", "admin", "super_admin"]);
+
 export async function POST(request: Request) {
-  let payload: { username?: string; password?: string };
+  let payload: { username?: string; password?: string; portal?: string };
   try {
     payload = await request.json();
   } catch {
     return NextResponse.json({ error: "malformed request body" }, { status: 400 });
   }
 
-  const { username, password } = payload;
+  const { username, password, portal } = payload;
   if (!username || !password) {
     return NextResponse.json({ error: "Enter your username, email or roll number and password." }, { status: 400 });
   }
@@ -58,6 +60,19 @@ export async function POST(request: Request) {
   }
 
   const body = await upstream.json();
+  // Two doors: staff sign in at /authority/login, students and guardians at /login. An account
+  // at the wrong door gets no cookies, just directions. (The tokens just issued are dropped
+  // unused; they are short-lived and never reach the browser.)
+  const staff = STAFF.has(body.role);
+  if ((portal === "authority" && !staff) || (portal === "student" && staff)) {
+    return NextResponse.json({
+      code: "wrong_portal",
+      login: staff ? "/authority/login" : "/login",
+      error: staff
+        ? "This is the student sign in. Teachers, HODs and admins use the authority sign in."
+        : "This is the authority sign in, for teachers and administrators. Students use the student sign in.",
+    }, { status: 403 });
+  }
   const res = NextResponse.json({
     role: body.role,
     display_name: body.display_name,

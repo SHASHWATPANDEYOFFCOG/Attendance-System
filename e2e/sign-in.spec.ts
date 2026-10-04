@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 
 import { ADMIN } from "./config.mjs";
-import { adminApi, approvedStudent, makeClass, signIn, uid } from "./helpers";
+import { adminApi, approvedStudent, latestMail, makeClass, signIn, uid } from "./helpers";
 
 test("staff sign in at the authority door and land on the authority dashboard", async ({ page }) => {
   await signIn(page, ADMIN.username, ADMIN.password, "authority");
@@ -44,4 +44,55 @@ test("a signed-out visit to a staff page goes to the authority sign in", async (
   await expect(page).toHaveURL(/\/authority\/login\?next=%2Fstaff%2Fstudents/);
   await page.goto("/student/leaves");
   await expect(page).toHaveURL(/\/login\?next=%2Fstudent%2Fleaves/);
+});
+
+test("a teacher registers at the authority door, is approved, then signs in", async ({ page, browser }) => {
+  const tag = uid();
+  const admin = await adminApi();
+  const cls = await makeClass(admin, tag);
+  const email = `staff.${tag.toLowerCase()}@e2e.test`;
+  const name = `Teacher ${tag}`;
+
+  await page.goto("/authority/login");
+  await page.getByRole("link", { name: "New staff member? Register" }).click();
+  await expect(page).toHaveURL(/\/authority\/register/);
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel(/^Full name/).fill(name);
+  await page.getByLabel(/^Email/).fill(email);
+  await page.getByLabel(/^Mobile number/).fill(`7${String(parseInt(tag, 36)).padStart(9, "0").slice(-9)}`);
+  await page.getByLabel(/^Employee \/ staff ID/).fill(`EMP${tag}`);
+  await page.getByLabel(/^Branch/).selectOption(String(cls.dept));
+  await page.getByLabel(/^Password/).fill("Teach-Pass-123");
+  await page.getByLabel(/^Confirm password/).fill("Teach-Pass-123");
+  await page.getByRole("button", { name: "Register" }).click();
+
+  await page.waitForURL(/\/verify-email/);
+  const code = /\b(\d{6})\b/.exec(await latestMail(email, "verification code"))![1];
+  await page.getByLabel("Verification code").fill(code);
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText(/administrator will review your request/)).toBeVisible();
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/authority\/login/);
+
+  // Not yet: the account exists but grants nothing.
+  await page.waitForLoadState("networkidle");
+  await page.locator("#username").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill("Teach-Pass-123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator("form [role=alert]")).toContainText("waiting for an administrator");
+
+  // The admin approves it from Approvals → Staff.
+  const ctx = await browser.newContext();
+  const staff = await ctx.newPage();
+  await signIn(staff, ADMIN.username, ADMIN.password, "authority");
+  await staff.goto("/staff/approvals?tab=staff");
+  const card = staff.locator("div").filter({ hasText: `EMP${tag}` }).filter({ has: staff.getByRole("button", { name: "Approve" }) }).last();
+  await card.getByRole("button", { name: "Approve" }).click();
+  await staff.getByRole("dialog").getByRole("button", { name: "Approve" }).click();
+  await expect(staff.getByText(`EMP${tag}`)).toHaveCount(0);
+  await ctx.close();
+
+  await signIn(page, email, "Teach-Pass-123", "authority");
+  await expect(page.getByRole("heading", { name: "Authority dashboard" })).toBeVisible();
+  await admin.dispose();
 });

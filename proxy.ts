@@ -21,6 +21,7 @@ const API_BASE = process.env.ATTENDANCE_API_BASE ?? "http://127.0.0.1:8079";
 const PUBLIC_PATHS = [
   "/login",
   "/authority/login",
+  "/authority/register",
   "/signup",
   "/verify-email",
   "/forgot-password",

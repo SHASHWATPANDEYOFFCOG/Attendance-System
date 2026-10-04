@@ -39,6 +39,7 @@ const ALLOWED = [
   /^api\/files\/\d+$/,
   /^api\/admin\/(users(\/\d+(\/unlock)?)?|settings|retention|lock-stale-sessions|audit)$/,
   /^api\/approvals\/summary$/,
+  /^api\/staff-registrations(\/\d+\/decide)?$/,
   /^api\/audit$/,
   /^api\/system\/status$/,
   /^api\/users(\/\d+\/biometrics)?$/,

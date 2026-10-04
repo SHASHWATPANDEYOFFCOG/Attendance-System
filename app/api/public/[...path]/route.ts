@@ -6,7 +6,7 @@
 const API_BASE = process.env.ATTENDANCE_API_BASE ?? "http://127.0.0.1:8079";
 
 const ALLOWED = [
-  /^auth\/(signup|verify-email|resend-otp|forgot-password|reset-password)$/,
+  /^auth\/(signup|staff-signup|verify-email|resend-otp|forgot-password|reset-password)$/,
   /^public\/academic-options$/,
 ];
 

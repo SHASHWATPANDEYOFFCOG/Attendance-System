@@ -22,13 +22,24 @@ type EditReq = {
   id: number; student_id: number; student: string; roll_number: string | null;
   changes: Record<string, unknown>; current: Record<string, unknown>; reason: string; created_at: string;
 };
-type Summary = { registrations: number; edit_requests: number; face_enrollments: number; reenroll_requests: number };
+type Summary = {
+  registrations: number; edit_requests: number; face_enrollments: number; reenroll_requests: number;
+  staff: number; can_review_staff: boolean;
+};
+type StaffReq = {
+  id: number; full_name: string; email: string; phone: string | null; email_verified: boolean;
+  employee_id: string; designation: string | null; requested_role: "faculty" | "admin";
+  department: string | null; created_at: string;
+};
 
 const TABS = [
   ["registrations", "Registrations"],
   ["edits", "Profile edits"],
   ["faces", "Face enrollments"],
+  ["staff", "Staff"],
 ] as const;
+
+const ROLE_NAME = { faculty: "Teacher", admin: "HOD" } as const;
 
 export default function ApprovalsPage() {
   return (
@@ -49,13 +60,16 @@ function Approvals() {
     registrations: summary?.registrations,
     edits: summary?.edit_requests,
     faces: summary ? summary.face_enrollments + summary.reenroll_requests : undefined,
+    staff: summary?.staff,
   };
+  // Only HODs and admins decide staff requests; the server enforces it, the tab just hides.
+  const tabs = TABS.filter(([key]) => key !== "staff" || summary?.can_review_staff);
 
   return (
     <Page wide>
-      <PageHeader title="Approvals" subtitle="Registrations, profile corrections and face enrollments waiting for you" />
+      <PageHeader title="Approvals" subtitle="Registrations, profile corrections, face enrollments and staff requests waiting for you" />
       <nav aria-label="Approval types" className="mb-4 flex flex-wrap gap-1">
-        {TABS.map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <Link
             key={key}
             href={`/staff/approvals?tab=${key}`}
@@ -70,6 +84,7 @@ function Approvals() {
       </nav>
       {tab === "edits" ? <EditRequests onChange={loadSummary} />
         : tab === "faces" ? <FaceReview onChange={loadSummary} />
+        : tab === "staff" ? <StaffRequests onChange={loadSummary} />
         : <Registrations onChange={loadSummary} />}
     </Page>
   );
@@ -139,6 +154,81 @@ function Registrations({ onChange }: { onChange: () => void }) {
             <Button variant="primary" onClick={() => decide(s, true)} disabled={!s.email_verified}>Approve</Button>
             <Button onClick={() => decide(s, false)}>Reject</Button>
             <Link href={`/staff/students/${s.id}`} className="display self-center px-2 text-[11.5px] text-ink">Full details</Link>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function StaffRequests({ onChange }: { onChange: () => void }) {
+  const { toast, confirm, askReason } = useUi();
+  const [rows, setRows] = useState<StaffReq[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      setRows(await api.get<StaffReq[]>("/api/staff-registrations"));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load.");
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function decide(r: StaffReq, approve: boolean) {
+    try {
+      if (approve) {
+        const ok = await confirm({
+          title: `Approve ${r.full_name} as ${ROLE_NAME[r.requested_role]}?`,
+          body: `${r.department ?? ""} · employee ID ${r.employee_id}. Check this against the staff list before approving: `
+            + "they will be able to see and mark attendance for their classes.",
+          confirmLabel: "Approve",
+        });
+        if (!ok) return;
+        await api.post(`/api/staff-registrations/${r.id}/decide`, { approve: true });
+        toast(`${r.full_name} approved.`);
+      } else {
+        const reason = await askReason({
+          title: `Reject ${r.full_name}?`, confirmLabel: "Reject", danger: true,
+          reason: { label: "Reason sent to them", minLength: 3 },
+        });
+        if (!reason) return;
+        await api.post(`/api/staff-registrations/${r.id}/decide`, { approve: false, reason });
+        toast(`${r.full_name} rejected.`);
+      }
+      load();
+      onChange();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Action failed.", "bad");
+    }
+  }
+
+  if (error) return <PageError message={error} retry={load} />;
+  if (!rows) return <PageLoading />;
+  if (!rows.length) {
+    return <EmptyState title="No staff requests waiting">Teachers who register at the authority register page appear here once they verify their email.</EmptyState>;
+  }
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {rows.map((r) => (
+        <Card key={r.id}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <strong className="text-[15px]">{r.full_name}</strong>
+            <Pill tone={r.requested_role === "admin" ? "warn" : "neutral"}>asks for {ROLE_NAME[r.requested_role]}</Pill>
+          </div>
+          <dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-[13px]">
+            <dt className="label pt-[2px] text-[11px]">Branch</dt><dd className="m-0">{r.department}</dd>
+            <dt className="label pt-[2px] text-[11px]">Employee ID</dt><dd className="m-0 font-mono">{r.employee_id}</dd>
+            {r.designation ? <><dt className="label pt-[2px] text-[11px]">Designation</dt><dd className="m-0">{r.designation}</dd></> : null}
+            <dt className="label pt-[2px] text-[11px]">Email</dt><dd className="m-0 break-all">{r.email}</dd>
+            {r.phone ? <><dt className="label pt-[2px] text-[11px]">Mobile</dt><dd className="m-0 font-mono">{r.phone}</dd></> : null}
+          </dl>
+          {!r.email_verified ? <div className="mt-2"><Pill tone="warn">email not verified</Pill></div> : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => decide(r, true)} disabled={!r.email_verified}>Approve</Button>
+            <Button onClick={() => decide(r, false)}>Reject</Button>
           </div>
         </Card>
       ))}

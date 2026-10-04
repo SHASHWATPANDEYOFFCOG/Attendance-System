@@ -27,6 +27,7 @@ function VerifyForm() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [signInAt, setSignInAt] = useState("/login");
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
@@ -42,11 +43,12 @@ function VerifyForm() {
     setBusy(true);
     setError(null);
     try {
-      const res = await publicApi.post<{ message: string }>("auth/verify-email", {
+      const res = await publicApi.post<{ message: string; portal?: string }>("auth/verify-email", {
         email: email.trim(),
         code: code.trim(),
       });
       setNotice(res.message);
+      if (res.portal === "authority") setSignInAt("/authority/login");
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed.");
@@ -71,7 +73,7 @@ function VerifyForm() {
       <AuthCard title="Email verified">
         <Banner>{notice}</Banner>
         <Link
-          href="/login"
+          href={signInAt}
           className="display mt-2 inline-flex rounded-[3px] border px-4 py-2.5 text-[12px] no-underline"
           style={{ background: "var(--ink)", borderColor: "var(--ink)", color: "var(--card)" }}
         >

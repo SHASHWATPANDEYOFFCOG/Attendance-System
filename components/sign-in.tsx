@@ -145,7 +145,11 @@ function LoginForm({ portal }: { portal: Portal }) {
               <Link href="/signup" className="text-ink underline-offset-2 hover:underline">
                 New student? Register
               </Link>
-            ) : null}
+            ) : (
+              <Link href="/authority/register" className="text-ink underline-offset-2 hover:underline">
+                New staff member? Register
+              </Link>
+            )}
           </div>
           <p className="mb-0 mt-4 border-t border-rule pt-3 text-center text-[13.5px] text-ash">
             {portal === "student" ? (

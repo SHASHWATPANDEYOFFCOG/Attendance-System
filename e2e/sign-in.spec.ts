@@ -46,9 +46,39 @@ test("a signed-out visit to a staff page goes to the authority sign in", async (
   await expect(page).toHaveURL(/\/login\?next=%2Fstudent%2Fleaves/);
 });
 
-test("a teacher registers at the authority door, is approved, then signs in", async ({ page, browser }) => {
+test("by default a registered teacher signs in as soon as the email is verified", async ({ page }) => {
   const tag = uid();
   const admin = await adminApi();
+  const cls = await makeClass(admin, tag);
+  const email = `quick.${tag.toLowerCase()}@e2e.test`;
+
+  await page.goto("/authority/register");
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByText(/your account is ready straight away/)).toBeVisible();
+  await page.getByLabel(/^Full name/).fill(`Quick ${tag}`);
+  await page.getByLabel(/^Email/).fill(email);
+  await page.getByLabel(/^Mobile number/).fill(`6${String(parseInt(tag, 36)).padStart(9, "0").slice(-9)}`);
+  await page.getByLabel(/^Employee \/ staff ID/).fill(`QEMP${tag}`);
+  await page.getByLabel(/^Branch/).selectOption(String(cls.dept));
+  await page.getByLabel(/^Password/).fill("Teach-Pass-123");
+  await page.getByLabel(/^Confirm password/).fill("Teach-Pass-123");
+  await page.getByRole("button", { name: "Register" }).click();
+
+  await page.waitForURL(/\/verify-email/);
+  const code = /\b(\d{6})\b/.exec(await latestMail(email, "verification code"))![1];
+  await page.getByLabel("Verification code").fill(code);
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText(/Your account is ready/)).toBeVisible();
+
+  await signIn(page, email, "Teach-Pass-123", "authority");
+  await expect(page.getByRole("heading", { name: "Authority dashboard" })).toBeVisible();
+  await admin.dispose();
+});
+
+test("with approval switched on, a registered teacher waits until an admin approves", async ({ page, browser }) => {
+  const tag = uid();
+  const admin = await adminApi();
+  await admin.patch("/api/backend/api/admin/settings", { data: { staff_registration_approval: true } });
   const cls = await makeClass(admin, tag);
   const email = `staff.${tag.toLowerCase()}@e2e.test`;
   const name = `Teacher ${tag}`;
@@ -94,5 +124,6 @@ test("a teacher registers at the authority door, is approved, then signs in", as
 
   await signIn(page, email, "Teach-Pass-123", "authority");
   await expect(page.getByRole("heading", { name: "Authority dashboard" })).toBeVisible();
+  await admin.patch("/api/backend/api/admin/settings", { data: { staff_registration_approval: false } });
   await admin.dispose();
 });

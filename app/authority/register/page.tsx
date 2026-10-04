@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Staff registration. Filling this in grants nothing: the account stays switched off until a
- * super admin (or, for a teacher, the HOD of the branch) approves it. The page says so up
- * front, so nobody expects instant access.
+ * Staff registration. After the emailed code, the account either works at once (as a Teacher)
+ * or waits for an administrator — the "Staff registrations need approval" setting decides, and
+ * the page says which up front. HOD rights are never self-granted.
  */
 import { useEffect, useState } from "react";
 
@@ -15,7 +15,10 @@ import { AuthCard, PublicShell } from "@/components/public-shell";
 import { Button, FormError, SelectField, TextField } from "@/components/forms";
 import { Banner } from "@/components/ui";
 
-type Options = { departments: { id: number; code: string; name: string }[] };
+type Options = {
+  departments: { id: number; code: string; name: string }[];
+  policy?: { staff_registration_approval?: boolean };
+};
 
 type Form = {
   full_name: string; email: string; mobile: string; employee_id: string; designation: string;
@@ -94,8 +97,9 @@ export default function AuthorityRegisterPage() {
     <PublicShell width={560} subtitle="Authority portal · staff registration">
       <AuthCard title="Register as staff">
         <Banner>
-          Your account becomes usable only after an administrator approves it (an HOD can approve
-          teachers of their own branch). We first email you a code to confirm your address.
+          {opts?.policy?.staff_registration_approval
+            ? "We email you a code to confirm your address. Your account then works once an administrator approves it (an HOD can approve teachers of their own branch)."
+            : "We email you a code to confirm your address, and your account is ready straight away. HOD rights are given by the administrator."}
         </Banner>
         {optsError ? <FormError>{optsError}</FormError> : null}
         {opts && opts.departments.length === 0 ? (
@@ -127,7 +131,7 @@ export default function AuthorityRegisterPage() {
             </SelectField>
             <SelectField label="I am a" required value={form.requested_role} onChange={set("requested_role")}
                          error={errors.requested_role}
-                         hint={form.requested_role === "admin" ? "HOD rights are granted by the administrator only." : undefined}>
+                         hint={form.requested_role === "admin" ? "HOD rights are granted by the administrator; until then you have teacher access." : undefined}>
               <option value="faculty">Teacher</option>
               <option value="admin">Head of department (HOD)</option>
             </SelectField>

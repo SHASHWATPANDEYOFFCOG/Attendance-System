@@ -135,6 +135,7 @@ class CaptureMethod(str, enum.Enum):
     CCTV = "cctv"                # classroom camera, written directly on confirmation
     MOBILE = "mobile"            # student selfie from their own phone/laptop
     SYSTEM = "system"            # filled at session close (absent / on leave)
+    PHOTO = "photo"              # teacher's tablet photo of the class, matches confirmed by them
 
 
 class LeaveType(str, enum.Enum):

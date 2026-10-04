@@ -27,13 +27,30 @@ def _lecture_now(db: Session, room: str):
         ClassSession.deleted_at.is_(None), ClassSession.scheduled_end >= now)).first()
 
 
+def lecture_for(db: Session, cam: Camera):
+    """The live lecture this camera serves: one it was connected to by hand, else its room's."""
+    linked = db.scalars(select(ClassSession).where(
+        ClassSession.camera_id == cam.id, ClassSession.state == SessionState.ACTIVE.value,
+        ClassSession.deleted_at.is_(None))).first()
+    return linked if linked is not None else _lecture_now(db, cam.room)
+
+
+def mark_managed(camera_id: int) -> None:
+    """A camera connected to a lecture by hand: stop it when that lecture ends, as if auto-started."""
+    _auto_started.add(camera_id)
+
+
+def forget(camera_id: int) -> None:
+    _auto_started.discard(camera_id)
+
+
 def tick(db: Session, cfg) -> dict:
     from app.worker import alert_camera_offline, registry
 
     started = stopped = alerted = 0
     stale_after = timedelta(seconds=float(cfg.attendance.camera_offline_after_s))
     for cam in db.scalars(select(Camera)):
-        lecture = _lecture_now(db, cam.room) if cam.enabled else None
+        lecture = lecture_for(db, cam) if cam.enabled else None
         running = registry.is_running(cam.id)
 
         if cam.enabled and cam.auto_start and lecture is not None and not running:

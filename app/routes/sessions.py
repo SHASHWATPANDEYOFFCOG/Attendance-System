@@ -442,7 +442,7 @@ def my_history(subject_id: Optional[int] = None, month: Optional[str] = None,
                 "subject_id": subj.id if subj else None, "status": r.effective_status,
                 "method": {"face": "camera", "cctv": "camera", "mobile": "selfie",
                            "qr": "QR code", "manual": "teacher", "system": "automatic",
-                           "import": "import"}.get(r.source, r.source),
+                           "import": "import", "photo": "tablet photo"}.get(r.source, r.source),
                 "note": note or ""}
 
     if format:
@@ -471,6 +471,11 @@ def my_history(subject_id: Optional[int] = None, month: Optional[str] = None,
         .join(ClassSession, ClassSession.subject_id == Subject.id)
         .join(AttendanceRecordRow, AttendanceRecordRow.session_id == ClassSession.id)
         .where(AttendanceRecordRow.user_id == target.id).distinct().order_by(Subject.code)).all()]
-    return {"rows": rows, "subjects": subjects,
+    # Per-status totals for the whole filtered set (not just this page), for the summary strip.
+    sub = stmt.order_by(None).subquery()
+    totals = {k: v for k, v in db.execute(
+        select(func.coalesce(sub.c.overridden_status, sub.c.status), func.count())
+        .group_by(func.coalesce(sub.c.overridden_status, sub.c.status))).all()}
+    return {"rows": rows, "subjects": subjects, "totals": totals,
             "meta": {"page": max(1, page), "page_size": page_size, "total": total,
                      "pages": (total + page_size - 1) // page_size}}

@@ -61,9 +61,18 @@ email code and/or administrator approval under Settings.)
    by hand. Changing a mark that is already recorded asks for a reason, which is logged and sent
    to the student. At the end time everyone unmarked becomes Absent (or On leave, if covered by
    approved leave).
-4. **Cameras.** Classroom cameras mark students they are confident about. Uncertain matches wait
-   in **Camera review** with the face crop next to the profile photo — accept or reject. You are
-   notified if a camera goes offline during your lecture.
+4. **Tablet photo and cameras.** On a live lecture's page:
+   - **Tablet photo** — photograph the class with a tablet or phone (**Open camera**, or the
+     device's own camera app). Recognised students are ticked for you; untick anyone who is not
+     there, tick "check" suggestions you are sure of, then **Mark … as here**. Take two or three
+     photos for a large room. Photos are never saved; unrecognised faces are not identified.
+   - **Classroom camera** — connect any registered CCTV camera to the lecture (useful when the
+     room's own camera is missing or a spare one covers the class better), **Check the view**,
+     and disconnect when done. A connected camera marks students it is confident about by itself
+     and stops when the lecture ends.
+
+   Uncertain camera matches wait in **Camera review** with the face crop next to the profile
+   photo — accept or reject. You are notified if a camera goes offline during your lecture.
 5. **Leave, issues, messages, notices.** Approve or reject leave (approving it also corrects
    absences already recorded for those days), answer issues, message one student, a class, or
    all your students, and post notices with optional email.

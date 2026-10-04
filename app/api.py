@@ -1345,12 +1345,13 @@ from app.routes import notifications as _notifications  # noqa: E402
 from app.routes import reports_ext as _reports_ext  # noqa: E402
 from app.routes import sessions as _sessions  # noqa: E402
 from app.routes import staff_signup as _staff_signup  # noqa: E402
+from app.routes import class_photo as _class_photo  # noqa: E402
 from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
            _sessions.router, _leaves.router, _issues.router, _messaging.router,
            _notifications.router, _face.router, _cameras.router, _reports_ext.router,
-           _staff_signup.router):
+           _staff_signup.router, _class_photo.router):
     app.include_router(_r)
 
 

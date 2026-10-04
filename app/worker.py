@@ -670,6 +670,12 @@ class CameraWorker(threading.Thread):
         sighting (session_id NULL) rather than attached to whatever session is nearest.
         """
         now = utcnow()
+        # Connected to a live lecture by hand (any room): that lecture wins.
+        linked = db.scalars(select(ClassSession).where(
+            ClassSession.camera_id == cam.id, ClassSession.state == "active",
+            ClassSession.deleted_at.is_(None))).first()
+        if linked is not None:
+            return linked
         early = timedelta(minutes=int(self.cfg.attendance.early_checkin_minutes))
         late = timedelta(minutes=int(self.cfg.attendance.late_checkin_minutes))
         # The slack is applied to `now` rather than to the columns: doing the arithmetic in SQL

@@ -75,6 +75,11 @@ def list_staff(role: Optional[str] = None, q: Optional[str] = None,
                               User.username.ilike(like)))
     if not (include_inactive and _role(actor) in ("admin", "super_admin")):
         stmt = stmt.where(User.is_active.is_(True))
+    # Self-registered staff are not colleagues until approved; they live in Approvals.
+    from app.models import StaffRegistration
+
+    stmt = stmt.where(User.id.notin_(select(StaffRegistration.user_id)
+                                     .where(StaffRegistration.status != "approved")))
     return [_staff_out(db, u) for u in db.scalars(stmt.order_by(User.display_name))]
 
 

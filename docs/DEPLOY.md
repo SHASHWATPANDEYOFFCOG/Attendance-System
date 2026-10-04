@@ -74,7 +74,8 @@ Sign in at `https://<your address>/authority/login` (staff; students use `/login
 1. **Settings** — college name, minimum attendance %, present/late windows, campus location.
 2. **Academic setup** — branches, batches, class groups (sections), subjects, rooms, term,
    timetable, holidays.
-3. **Staff & roles** — add teachers and HODs (they receive an email to set their password).
+3. **Staff & roles** — add teachers and HODs (they receive an email to set their password), or
+   let them register at `/authority/register` and approve them under **Approvals → Staff**.
 4. **Students** — import a spreadsheet (**Directory → Import CSV / Excel**), add them one by one, or let them
    self-register at `/signup` and approve them under **Approvals**.
 5. **CCTV cameras** — optional, see below.

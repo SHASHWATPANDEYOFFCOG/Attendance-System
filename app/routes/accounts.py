@@ -252,6 +252,9 @@ def verify_email(body: VerifyIn, request: Request, db: Session = Depends(get_db)
     otp.consumed_at = utcnow()
     user.email_verified_at = utcnow()
 
+    from app.routes.staff_signup import on_email_verified
+
+    staff_message = on_email_verified(db, user)
     prof = _profile(db, user.id)
     if prof is not None and prof.status == StudentStatus.PENDING.value:
         notify(db, responsible_staff(db, prof), "registration_pending",
@@ -261,6 +264,8 @@ def verify_email(body: VerifyIn, request: Request, db: Session = Depends(get_db)
                f"for approval.", link="/staff/approvals", email=True)
     audit(db, user, "email_verified", target_type="user", target_id=user.id, request=request)
     db.commit()
+    if staff_message:
+        return {"verified": True, "portal": "authority", "message": staff_message}
     return {"verified": True,
             "message": "Email verified. You can sign in; a teacher will approve your account."}
 

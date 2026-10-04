@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app import analytics_service as analytics
 from app import validation as V
 from app.audit import audit
-from app.auth import is_super_admin, require_admin, require_staff
+from app.auth import is_admin, is_super_admin, require_admin, require_staff
 from app.clock import tz_of
 from app.crypto import hash_password, token_digest
 from app.db import get_db
@@ -254,9 +254,19 @@ def approvals_summary(db: Session = Depends(get_db), actor: User = Depends(requi
         select(func.count()).select_from(FaceReenrollRequest)
         .join(StudentProfile, StudentProfile.user_id == FaceReenrollRequest.user_id)
         .where(FaceReenrollRequest.status == "pending", scope)) or 0
+    staff = 0
+    if is_admin(actor):
+        from app.models import StaffRegistration
+        from app.routes.staff_signup import scoped_registrations
+
+        staff = db.scalar(select(func.count()).select_from(
+            scoped_registrations(db, actor).join(User, User.id == StaffRegistration.user_id)
+            .where(StaffRegistration.status == "pending", User.email_verified_at.is_not(None))
+            .subquery())) or 0
     return {"registrations": pending_students, "edit_requests": edit_requests,
-            "face_enrollments": faces, "reenroll_requests": reenroll,
-            "total": pending_students + edit_requests + faces + reenroll}
+            "face_enrollments": faces, "reenroll_requests": reenroll, "staff": staff,
+            "can_review_staff": is_admin(actor),
+            "total": pending_students + edit_requests + faces + reenroll + staff}
 
 
 # ------------------------------------------------------------ edit requests

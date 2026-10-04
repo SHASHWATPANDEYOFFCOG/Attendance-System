@@ -914,6 +914,30 @@ class ProfileEditRequest(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class StaffRegistration(Base):
+    """A teacher or HOD who asked for an account through the authority register form.
+
+    Their user row exists from the start but stays `is_active=False` — no sign-in, no access —
+    until a super admin (or, for a teacher, the HOD of their branch) approves the request. The
+    role they asked for is a request; the approver decides what they actually get.
+    """
+
+    __tablename__ = "staff_registrations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True,
+                                         index=True)
+    requested_role: Mapped[str] = mapped_column(String(16))           # faculty | admin
+    department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"), index=True)
+    employee_id: Mapped[str] = mapped_column(String(48), unique=True, index=True)
+    designation: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default=ReviewStatus.PENDING.value, index=True)
+    reason: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    decided_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class FaceReenrollRequest(Base):
     """New glasses, a beard: a student asks to replace their template; a teacher allows it."""
 

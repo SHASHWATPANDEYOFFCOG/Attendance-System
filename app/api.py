@@ -280,6 +280,24 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid username or password")
     if not user.is_active:
+        # A staff member who registered themselves: say where their request stands (only to
+        # someone who just proved they know the password).
+        from app.routes.staff_signup import registration_for
+
+        reg = registration_for(db, user.id)
+        if reg is not None and reg.status == "pending" and user.email_verified_at is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
+                "code": "email_unverified",
+                "message": "Verify your email address before signing in.", "email": user.email})
+        if reg is not None and reg.status == "pending":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
+                "code": "staff_pending",
+                "message": "Your staff registration is waiting for an administrator's approval. "
+                           "You will get an email as soon as it is decided."})
+        if reg is not None and reg.status == "rejected":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
+                "code": "staff_rejected",
+                "message": f"Your staff registration was not approved. Reason: {reg.reason}"})
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail={
             "code": "disabled", "message": "This account has been disabled."})
 
@@ -1300,11 +1318,13 @@ from app.routes import messaging as _messaging  # noqa: E402
 from app.routes import notifications as _notifications  # noqa: E402
 from app.routes import reports_ext as _reports_ext  # noqa: E402
 from app.routes import sessions as _sessions  # noqa: E402
+from app.routes import staff_signup as _staff_signup  # noqa: E402
 from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
            _sessions.router, _leaves.router, _issues.router, _messaging.router,
-           _notifications.router, _face.router, _cameras.router, _reports_ext.router):
+           _notifications.router, _face.router, _cameras.router, _reports_ext.router,
+           _staff_signup.router):
     app.include_router(_r)
 
 

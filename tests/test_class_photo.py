@@ -24,6 +24,20 @@ class ClassPhotoFake(FakePipeline):
         return faces
 
 
+@pytest.fixture(autouse=True)
+def no_tablet_requirement(api):
+    """These tests are about the photo itself; tests/test_administration.py covers the tablet
+    requirement, so it is switched off here."""
+    from app import settings_service
+    from app.runtime import cfg
+
+    db = _db()
+    settings_service.update(db, cfg, {"tablet_required": False}, actor_id=None)
+    db.commit()
+    db.close()
+    settings_service.invalidate()
+
+
 @pytest.fixture()
 def fake(api, monkeypatch):
     import app.pipeline_service as ps
@@ -131,7 +145,10 @@ def no_workers(monkeypatch):
 
 
 def test_connect_any_camera_to_a_live_lecture_and_disconnect(api, klass, no_workers):
-    cam = api.post("/api/cameras", json={"name": "Spare cam", "room": "Store", "source": "rtsp://10.0.0.9/s1"},
+    ws = api.post("/api/workspaces", json={"name": "Block A", "member_ids": [klass["teacher"]]},
+                  headers=klass["admin"]).json()["id"]
+    cam = api.post("/api/cameras", json={"name": "Spare cam", "room": "Store", "source": "rtsp://10.0.0.9/s1",
+                                         "workspace_id": ws},
                    headers=klass["admin"]).json()["id"]
     sid = _make_session(klass)
     h = klass["teacher_h"]

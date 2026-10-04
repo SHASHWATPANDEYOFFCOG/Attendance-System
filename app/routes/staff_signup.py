@@ -55,11 +55,19 @@ class StaffSignupIn(BaseModel):
     designation: Optional[str] = Field(None, max_length=80)
     department_id: int
     requested_role: str = "faculty"
+    #: The authority access code the administrator gave out (default "occlubio-authority").
+    access_code: str = Field("", max_length=64)
 
 
 @router.post("/auth/staff-signup", status_code=201)
 def staff_signup(body: StaffSignupIn, request: Request, db: Session = Depends(get_db)):
     enforce(request, "signup")
+    from app import access_codes
+
+    enforce(request, "access_code")
+    if not access_codes.verify(db, "authority", body.access_code):
+        raise HTTPException(403, detail={"field": "access_code",
+                                         "message": "That authority access code is not valid. Ask your administrator for it."})
     try:
         name = V.name(body.full_name)
         email = V.email(body.email)

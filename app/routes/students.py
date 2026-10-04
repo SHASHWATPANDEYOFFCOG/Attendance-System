@@ -94,6 +94,7 @@ def _pct_map(db: Session, user_ids: List[int]) -> Dict[int, Optional[float]]:
 
 def _row(u: User, prof: StudentProfile, pct: Optional[float]) -> dict:
     sec = prof.section
+    ay = sec.academic_year if sec is not None else None
     return {
         "id": u.id, "full_name": u.display_name, "email": u.email, "phone": u.phone,
         "roll_number": prof.roll_number or u.roll_number, "enrollment_no": prof.enrollment_no,
@@ -102,7 +103,10 @@ def _row(u: User, prof: StudentProfile, pct: Optional[float]) -> dict:
         "batch": prof.batch.label if prof.batch else None,
         "year": prof.year or (sec.year if sec else None),
         "section_id": prof.section_id, "section": section_label(sec) if sec else None,
+        "section_name": sec.name if sec else None,
+        "academic_year": ay.label if ay else None,
         "status": prof.status, "email_verified": u.email_verified_at is not None,
+        "reason": prof.rejection_reason, "decided_at": prof.decided_at,
         "has_face": u.has_biometrics, "attendance_pct": pct,
         "photo_url": f"/api/files/{prof.photo_file_id}" if prof.photo_file_id else None,
         "created_at": u.created_at,
@@ -116,6 +120,7 @@ def list_students(
     q: Optional[str] = None, department_id: Optional[int] = None,
     batch_id: Optional[int] = None, year: Optional[int] = None,
     section_id: Optional[int] = None, status: Optional[str] = None,
+    academic_year_id: Optional[int] = None,
     min_pct: Optional[float] = None, max_pct: Optional[float] = None,
     page: int = 1, page_size: int = 50,
     db: Session = Depends(get_db), actor: User = Depends(require_staff),
@@ -138,6 +143,9 @@ def list_students(
         stmt = stmt.where(StudentProfile.section_id == section_id)
     if status:
         stmt = stmt.where(StudentProfile.status == status)
+    if academic_year_id:
+        stmt = stmt.where(StudentProfile.section_id.in_(
+            select(Section.id).where(Section.academic_year_id == academic_year_id)))
     stmt = stmt.order_by(StudentProfile.roll_number, User.display_name)
 
     page_size = max(10, min(200, page_size))
@@ -190,52 +198,158 @@ class DecisionIn(BaseModel):
     reason: Optional[str] = Field(None, max_length=300)
 
 
+# ------------------------------------------------------------- decisions
+#
+#   approve   pending / rejected  -> approved
+#   reject    pending / approved  -> rejected   (reason required, shown to the student)
+#   revoke    approved            -> revoked    (reason required; attendance stops, record kept)
+#   restore   revoked             -> approved
+#
+# Every decision is audited with its previous and new status.
+
+ACTIONS = ("approve", "reject", "revoke", "restore")
+
+
+class DecisionError(Exception):
+    def __init__(self, code: int, message: str):
+        super().__init__(message)
+        self.code, self.message = code, message
+
+
+def decide_student(db: Session, actor: User, student_id: int, action: str,
+                   reason: Optional[str], request: Request) -> str:
+    try:
+        prof = assert_can_manage_student(db, actor, student_id)
+    except HTTPException as exc:
+        raise DecisionError(exc.status_code, str(exc.detail))
+    user = db.get(User, student_id)
+    before = prof.status
+    reason = (reason or "").strip()
+    S = StudentStatus
+    if action == "approve":
+        if before == S.APPROVED.value:
+            raise DecisionError(409, "Already approved.")
+        if before == S.REVOKED.value:
+            raise DecisionError(409, "Access was revoked; use Restore.")
+    elif action == "reject":
+        if before == S.REJECTED.value:
+            raise DecisionError(409, "Already rejected.")
+        if before == S.REVOKED.value:
+            raise DecisionError(409, "Access is revoked; restore it first.")
+    elif action == "revoke":
+        if before != S.APPROVED.value:
+            raise DecisionError(409, "Only an approved student's access can be revoked.")
+    elif action == "restore":
+        if before != S.REVOKED.value:
+            raise DecisionError(409, "Only revoked access can be restored.")
+    else:
+        raise DecisionError(422, "Unknown action.")
+    if action in ("reject", "revoke") and len(reason) < 3:
+        raise DecisionError(422, "Give a reason; the student sees it.")
+
+    vouched = False
+    if action in ("approve", "restore"):
+        # A teacher approving a registration has checked the person against college records,
+        # which vouches for the address too: a student whose code never arrived is not stuck.
+        vouched = bool(user.email and user.email_verified_at is None)
+        if vouched:
+            user.email_verified_at = utcnow()
+        prof.status = S.APPROVED.value
+        prof.rejection_reason = None
+    elif action == "reject":
+        prof.status = S.REJECTED.value
+        prof.rejection_reason = reason
+    else:
+        prof.status = S.REVOKED.value
+        prof.rejection_reason = reason
+    prof.decided_by_id, prof.decided_at = actor.id, utcnow()
+
+    if action == "approve":
+        notify(db, [user.id], "registration_approved", "Registration approved",
+               "Your account has been approved. You now have full access, including marking "
+               "attendance.", link="/student", email=True)
+    elif action == "restore":
+        notify(db, [user.id], "access_restored", "Access restored",
+               "Your access has been restored. You can mark attendance again.", link="/student", email=True)
+    elif action == "reject":
+        notify(db, [user.id], "registration_rejected", "Registration rejected",
+               f"Your registration was not approved. Reason: {reason}. You can correct your "
+               f"details from your profile and resubmit.", link="/student/profile", email=True)
+    else:
+        notify(db, [user.id], "access_revoked", "Access revoked",
+               f"Your access to mark attendance was revoked. Reason: {reason}. Contact your "
+               f"teacher or the college office.", link="/student", email=True)
+    detail = {"from": before, "to": prof.status}
+    if vouched:
+        detail["email_verified_by_staff"] = True
+    audit(db, actor, {"approve": "student_approved", "reject": "student_rejected",
+                      "revoke": "student_access_revoked", "restore": "student_access_restored"}[action],
+          target_type="user", target_id=user.id, reason=reason or None, detail=detail, request=request)
+    return prof.status
+
+
+def _decide_one(db: Session, actor: User, student_id: int, action: str,
+                reason: Optional[str], request: Request) -> dict:
+    try:
+        status_now = decide_student(db, actor, student_id, action, reason, request)
+    except DecisionError as exc:
+        db.rollback()
+        if exc.code == 422 and action in ("reject", "revoke"):
+            raise HTTPException(422, detail={"field": "reason", "message": exc.message})
+        raise HTTPException(exc.code, exc.message)
+    db.commit()
+    return {"id": student_id, "status": status_now}
+
+
 @router.post("/students/{student_id}/approve")
 def approve_student(student_id: int, request: Request, db: Session = Depends(get_db),
                     actor: User = Depends(require_staff)):
-    prof = assert_can_manage_student(db, actor, student_id)
-    user = db.get(User, student_id)
-    if prof.status == StudentStatus.APPROVED.value:
-        raise HTTPException(409, "This student is already approved.")
-    # A teacher approving a registration has checked the person against college records, which
-    # vouches for the address too. Without this, a student whose code never arrived (a bouncing
-    # mail provider, a typo-free but filtered inbox) would be locked out for good.
-    vouched = bool(user.email and user.email_verified_at is None)
-    if vouched:
-        user.email_verified_at = utcnow()
-    prof.status = StudentStatus.APPROVED.value
-    prof.rejection_reason = None
-    prof.decided_by_id, prof.decided_at = actor.id, utcnow()
-    notify(db, [user.id], "registration_approved", "Registration approved",
-           "Your account has been approved. You now have full access, including marking "
-           "attendance.", link="/student", email=True)
-    audit(db, actor, "student_approved", target_type="user", target_id=user.id, request=request,
-          detail={"email_verified_by_staff": True} if vouched else None)
-    db.commit()
-    return {"id": user.id, "status": prof.status}
+    return _decide_one(db, actor, student_id, "approve", None, request)
 
 
 @router.post("/students/{student_id}/reject")
 def reject_student(student_id: int, body: DecisionIn, request: Request,
                    db: Session = Depends(get_db), actor: User = Depends(require_staff)):
-    prof = assert_can_manage_student(db, actor, student_id)
-    reason = (body.reason or "").strip()
-    if len(reason) < 3:
-        raise HTTPException(422, detail={"field": "reason",
-                                         "message": "Give the student a reason for the rejection."})
-    if prof.status == StudentStatus.REJECTED.value:
-        raise HTTPException(409, "This registration is already rejected.")
-    was_approved = prof.status == StudentStatus.APPROVED.value
-    prof.status = StudentStatus.REJECTED.value
-    prof.rejection_reason = reason
-    prof.decided_by_id, prof.decided_at = actor.id, utcnow()
-    notify(db, [student_id], "registration_rejected", "Registration rejected",
-           f"Your registration was not approved. Reason: {reason}. You can correct your "
-           f"details from your profile and resubmit.", link="/student/profile", email=True)
-    audit(db, actor, "student_rejected", target_type="user", target_id=student_id,
-          reason=reason, detail={"was_approved": was_approved}, request=request)
-    db.commit()
-    return {"id": student_id, "status": prof.status}
+    return _decide_one(db, actor, student_id, "reject", body.reason, request)
+
+
+@router.post("/students/{student_id}/revoke")
+def revoke_student(student_id: int, body: DecisionIn, request: Request,
+                   db: Session = Depends(get_db), actor: User = Depends(require_staff)):
+    return _decide_one(db, actor, student_id, "revoke", body.reason, request)
+
+
+@router.post("/students/{student_id}/restore")
+def restore_student(student_id: int, request: Request, db: Session = Depends(get_db),
+                    actor: User = Depends(require_staff)):
+    return _decide_one(db, actor, student_id, "restore", None, request)
+
+
+class BulkDecisionIn(BaseModel):
+    ids: List[int] = Field(min_length=1, max_length=500)
+    action: str
+    reason: Optional[str] = Field(None, max_length=300)
+
+
+@router.post("/students/bulk-decision")
+def bulk_decision(body: BulkDecisionIn, request: Request, db: Session = Depends(get_db),
+                  actor: User = Depends(require_staff)):
+    """Apply one decision to many students. Each is checked and audited on its own; the ones
+    that cannot take it (wrong status, outside your scope) are reported, the rest are done."""
+    if body.action not in ACTIONS:
+        raise HTTPException(422, detail={"field": "action", "message": "Unknown action."})
+    if body.action in ("reject", "revoke") and len((body.reason or "").strip()) < 3:
+        raise HTTPException(422, detail={"field": "reason", "message": "Give a reason; the students see it."})
+    done, failed = [], []
+    for sid in dict.fromkeys(body.ids):
+        try:
+            decide_student(db, actor, sid, body.action, body.reason, request)
+            db.commit()
+            done.append(sid)
+        except DecisionError as exc:
+            db.rollback()
+            failed.append({"id": sid, "message": exc.message})
+    return {"done": done, "failed": failed}
 
 
 @router.get("/approvals/summary")

@@ -25,7 +25,8 @@ from sqlalchemy.orm import Session
 
 from app import settings_service
 from app.audit import audit
-from app.auth import assert_owns_session, require_staff
+from app.auth import assert_owns_session, is_super_admin, require_staff
+from app.resources import camera_visible, current_tablet, tablet_usable_by
 from app.db import get_db
 from app.gallery_service import match_among, user_templates
 from app.models import (
@@ -57,6 +58,24 @@ def _live_session(db: Session, actor: User, session_id: int) -> ClassSession:
     if s.state != SessionState.ACTIVE.value:
         raise HTTPException(409, "Start the lecture first. Attendance can only be taken while it is live.")
     return s
+
+
+def _device_gate(db: Session, request: Request, actor: User):
+    """The registered tablet this request comes from; required (unless administrator) when the
+    "tablet_required" setting is on. Returns the tablet or None."""
+    tablet = current_tablet(request, db)
+    if is_super_admin(actor) or not settings_service.get(db, cfg, "tablet_required"):
+        return tablet
+    if tablet is None:
+        raise HTTPException(403, detail={
+            "code": "tablet_required",
+            "message": "Use a registered tablet for this. Register and pair this device under Tablets, "
+                       "or ask your administrator."})
+    if not tablet_usable_by(db, actor, tablet):
+        raise HTTPException(403, detail={
+            "code": "tablet_not_yours",
+            "message": f"This tablet ({tablet.name}) belongs to a workspace you are not a member of."})
+    return tablet
 
 
 # ------------------------------------------------------------------ analyse
@@ -139,6 +158,7 @@ def analyse_photo(db: Session, session: ClassSession, img, pipeline) -> dict:
 async def class_photo(session_id: int, request: Request, photo: UploadFile = File(...),
                       db: Session = Depends(get_db), actor: User = Depends(require_staff)):
     s = _live_session(db, actor, session_id)
+    _device_gate(db, request, actor)
     from app.routes import face as face_mod                 # decode/pipeline shared with selfies
 
     data = await read_limited(photo, MAX_PHOTO)
@@ -166,6 +186,7 @@ def confirm_class_photo(session_id: int, body: ConfirmIn, request: Request,
     """Mark the students the teacher confirmed from the photo. Present / late follow the time
     windows; after the late window a student the teacher saw in class is marked late."""
     s = _live_session(db, actor, session_id)
+    _device_gate(db, request, actor)
     roster = set(approved_roster(db, s))
     outside = [u for u in body.user_ids if u not in roster]
     if outside:
@@ -200,17 +221,27 @@ def _camera_out(cam: Optional[Camera]) -> Optional[dict]:
 
 
 @router.get("/sessions/{session_id}/camera")
-def session_camera(session_id: int, db: Session = Depends(get_db), actor: User = Depends(require_staff)):
+def session_camera(session_id: int, request: Request, db: Session = Depends(get_db),
+                   actor: User = Depends(require_staff)):
     s = db.get(ClassSession, session_id)
     if s is None:
         raise HTTPException(404, "session not found")
     assert_owns_session(actor, s)
+    tablet = current_tablet(request, db)
+    gate_ok = True
+    try:
+        _device_gate(db, request, actor)
+    except HTTPException as exc:
+        gate_ok, gate_reason = False, exc.detail["message"]
+    visible = [c for c in db.scalars(select(Camera).where(Camera.enabled.is_(True)).order_by(Camera.name))
+               if camera_visible(db, actor, c, tablet)]
     linked = db.get(Camera, s.camera_id) if s.camera_id else None
-    in_room = [c for c in db.scalars(select(Camera).where(Camera.room == s.room, Camera.enabled.is_(True)))]
+    db.commit()
     return {"connected": _camera_out(linked),
-            "in_room": [_camera_out(c) for c in in_room],
-            "available": [_camera_out(c) for c in db.scalars(
-                select(Camera).where(Camera.enabled.is_(True)).order_by(Camera.name))]}
+            "in_room": [_camera_out(c) for c in visible if c.room == s.room],
+            "available": [_camera_out(c) for c in visible],
+            "allowed": gate_ok, "reason": None if gate_ok else gate_reason,
+            "tablet": {"name": tablet.name, "code": tablet.code} if tablet else None}
 
 
 class ConnectIn(BaseModel):
@@ -224,7 +255,10 @@ def connect_camera(session_id: int, body: ConnectIn, request: Request,
     from app.worker import registry
 
     s = _live_session(db, actor, session_id)
+    tablet = _device_gate(db, request, actor)
     cam = db.get(Camera, body.camera_id)
+    if cam is not None and not camera_visible(db, actor, cam, tablet):
+        cam = None
     if cam is None or not cam.enabled:
         raise HTTPException(404, "That camera does not exist or is switched off in CCTV cameras.")
     other = db.scalars(select(ClassSession).where(
@@ -270,7 +304,8 @@ def disconnect_camera(session_id: int, request: Request, db: Session = Depends(g
 
 
 @router.get("/sessions/{session_id}/camera/preview")
-def camera_preview(session_id: int, db: Session = Depends(get_db), actor: User = Depends(require_staff)):
+def camera_preview(session_id: int, request: Request, db: Session = Depends(get_db),
+                   actor: User = Depends(require_staff)):
     """One frame from the lecture's camera, so the teacher can check what it sees. Not stored."""
     from app.cctv import grab_frame, jpeg_data_url, stream_url
 
@@ -281,6 +316,9 @@ def camera_preview(session_id: int, db: Session = Depends(get_db), actor: User =
     cam = db.get(Camera, s.camera_id) if s.camera_id else None
     if cam is None:
         raise HTTPException(409, "No camera is connected to this lecture.")
+    tablet = _device_gate(db, request, actor)
+    if not camera_visible(db, actor, cam, tablet):
+        raise HTTPException(403, "You do not have access to this camera.")
     frame, error = grab_frame(stream_url(cam))
     if frame is None:
         return {"ok": False, "error": error}

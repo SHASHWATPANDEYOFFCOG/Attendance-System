@@ -94,6 +94,10 @@ class CameraIn(BaseModel):
     password: Optional[str] = Field(None, max_length=200)
     enabled: bool = True
     auto_start: bool = True
+    code: Optional[str] = Field(None, max_length=32)
+    camera_type: str = Field("rtsp", max_length=16)
+    description: Optional[str] = Field(None, max_length=300)
+    workspace_id: Optional[int] = None
 
 
 class CameraOut(BaseModel):
@@ -110,6 +114,13 @@ class CameraOut(BaseModel):
     enabled: bool = True
     auto_start: bool = False
     has_credentials: bool = False
+    code: Optional[str] = None
+    camera_type: str = "rtsp"
+    description: Optional[str] = None
+    workspace_id: Optional[int] = None
+    workspace: Optional[str] = None
+    #: online | offline | connecting | idle | disabled -- what an operator needs at a glance
+    state: str = "idle"
 
 
 class SessionIn(BaseModel):

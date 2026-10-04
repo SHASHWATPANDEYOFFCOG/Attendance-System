@@ -57,6 +57,7 @@ from app.auth import (
     readable_user_ids,
     require_admin,
     require_staff,
+    require_super_admin,
 )
 from app.bus import bus, emit
 from app.clock import local_today, tz_of
@@ -182,12 +183,32 @@ def _camera_out(c: Camera) -> CameraOut:
         status_val = CameraStatus.OFFLINE.value
     from app.cctv import mask_source
 
+    running = registry.is_running(c.id)
+    if not c.enabled:
+        state = "disabled"
+    elif status_val == CameraStatus.STARTING.value:
+        state = "connecting"
+    elif status_val in (CameraStatus.OFFLINE.value, CameraStatus.ERROR.value):
+        state = "offline"
+    else:
+        state = "online" if running else "idle"
+    ws = None
+    if c.workspace_id:
+        from sqlalchemy.orm import object_session
+
+        from app.models import Workspace
+
+        sess = object_session(c)
+        w = sess.get(Workspace, c.workspace_id) if sess is not None else None
+        ws = w.name if w else None
     return CameraOut(
         id=c.id, name=c.name, room=c.room, source=mask_source(c.source), mode=c.mode,
         status=status_val, status_detail=c.status_detail, last_heartbeat=c.last_heartbeat,
-        measured_fps=c.measured_fps, running=registry.is_running(c.id),
+        measured_fps=c.measured_fps, running=running,
         enabled=c.enabled, auto_start=c.auto_start,
         has_credentials=bool(c.username_encrypted or c.password_encrypted),
+        code=c.code, camera_type=c.camera_type or "rtsp", description=c.description,
+        workspace_id=c.workspace_id, workspace=ws, state=state,
     )
 
 
@@ -484,42 +505,65 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_staff),
 
 # ------------------------------------------------------------------ cameras
 
+CAMERA_TYPES = ("rtsp", "http", "onvif", "usb", "file")
+
 @app.post("/api/cameras", response_model=CameraOut, status_code=201)
-def create_camera(body: CameraIn, db: Session = Depends(get_db),
-                  _: User = Depends(require_admin)):
+def create_camera(body: CameraIn, request: Request, db: Session = Depends(get_db),
+                  actor: User = Depends(require_super_admin)):
     from app.cctv import mask_source
     from app.crypto import encrypt_text
 
     if mask_source(body.source) != body.source:
         raise HTTPException(422, "Put the username and password in their own fields, not in the "
                                  "stream address — they are stored encrypted that way.")
+    from app.models import Workspace
+    from app.routes.administration import _clean_code, _next_code
+
+    if body.camera_type not in CAMERA_TYPES:
+        raise HTTPException(422, detail={"field": "camera_type", "message": "Choose a camera type from the list."})
+    if body.workspace_id is not None and db.get(Workspace, body.workspace_id) is None:
+        raise HTTPException(422, detail={"field": "workspace_id", "message": "That workspace does not exist."})
     cam = Camera(name=body.name.strip(), room=body.room.strip(), source=body.source.strip(),
                  mode=body.mode, enabled=body.enabled, auto_start=body.auto_start,
+                 code=_clean_code(body.code, "code") or _next_code(db, Camera, "CAM"),
+                 camera_type=body.camera_type, description=(body.description or "").strip() or None,
+                 workspace_id=body.workspace_id,
                  username_encrypted=encrypt_text(body.username) if body.username else None,
                  password_encrypted=encrypt_text(body.password) if body.password else None)
     db.add(cam)
     try:
-        db.commit()
+        db.flush()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(409, "a camera with that name already exists")
+        raise HTTPException(409, "A camera with that name or ID already exists.")
+    from app.audit import audit as _audit
+
+    _audit(db, actor, "camera_added", target_type="camera", target_id=cam.id,
+           detail={"name": cam.name, "workspace_id": cam.workspace_id}, request=request)
+    db.commit()
     db.refresh(cam)
     return _camera_out(cam)
 
 
 @app.get("/api/cameras", response_model=List[CameraOut])
-def list_cameras(db: Session = Depends(get_db), _: User = Depends(require_staff)):
-    """Staff only. A student token never sees a camera, by design."""
-    return [_camera_out(c) for c in db.scalars(select(Camera))]
+def list_cameras(db: Session = Depends(get_db), actor: User = Depends(require_staff)):
+    """Staff only, and only the cameras of the caller's workspaces (administrators: all)."""
+    from app.resources import visible_cameras_stmt
+
+    return [_camera_out(c) for c in db.scalars(visible_cameras_stmt(db, actor).order_by(Camera.name))]
 
 
 @app.post("/api/cameras/{camera_id}/start")
 def start_camera(camera_id: int, db: Session = Depends(get_db),
                  actor: User = Depends(require_staff)):
     """Spawn the worker thread. The capture loop never runs inside a request handler."""
+    from app.resources import camera_visible
+
     cam = db.get(Camera, camera_id)
-    if cam is None:
+    if cam is None or not camera_visible(db, actor, cam):
         raise HTTPException(404, "camera not found")
+    if not cam.enabled:
+        raise HTTPException(409, "This camera is disabled. Enable it first.")
     worker = registry.start(camera_id, cfg)
     db.add(AuditLog(actor_id=actor.id, action="camera_start", target_type="camera",
                     target_id=str(camera_id)))
@@ -532,8 +576,12 @@ def start_camera(camera_id: int, db: Session = Depends(get_db),
 @app.post("/api/cameras/{camera_id}/stop")
 def stop_camera(camera_id: int, db: Session = Depends(get_db),
                 actor: User = Depends(require_staff)):
-    stopped = registry.stop(camera_id)
+    from app.resources import camera_visible
+
     cam = db.get(Camera, camera_id)
+    if cam is None or not camera_visible(db, actor, cam):
+        raise HTTPException(404, "camera not found")
+    stopped = registry.stop(camera_id)
     if cam is not None:
         cam.status = CameraStatus.STOPPED
         cam.status_detail = "stopped by operator"
@@ -1346,12 +1394,13 @@ from app.routes import reports_ext as _reports_ext  # noqa: E402
 from app.routes import sessions as _sessions  # noqa: E402
 from app.routes import staff_signup as _staff_signup  # noqa: E402
 from app.routes import class_photo as _class_photo  # noqa: E402
+from app.routes import administration as _administration  # noqa: E402
 from app.routes import students as _students  # noqa: E402
 
 for _r in (_academic.router, _accounts.router, _students.router, _files.router, _admin.router,
            _sessions.router, _leaves.router, _issues.router, _messaging.router,
            _notifications.router, _face.router, _cameras.router, _reports_ext.router,
-           _staff_signup.router, _class_photo.router):
+           _staff_signup.router, _class_photo.router, _administration.router):
     app.include_router(_r)
 
 

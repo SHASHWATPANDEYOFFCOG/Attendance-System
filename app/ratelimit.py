@@ -73,6 +73,7 @@ LIMITS = {
     "signup": (10, 3600.0),
     "attendance": (30, 60.0),
     "face": (60, 60.0),
+    "access_code": (10, 900.0),     # administrator code, tablet pairing: guessing is the threat
 }
 
 

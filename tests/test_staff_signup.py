@@ -33,7 +33,7 @@ def _register(api, dept, *, email="new.teacher@college.edu", role="faculty", emp
     return api.post("/api/auth/staff-signup", json={
         "full_name": "New Teacher", "email": email, "mobile": mobile, "password": "Teach-Pass-123",
         "employee_id": emp, "designation": "Assistant Professor", "department_id": dept,
-        "requested_role": role})
+        "requested_role": role, "access_code": "occlubio-authority"})
 
 
 def _verify(api, email):

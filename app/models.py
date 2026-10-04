@@ -151,6 +151,7 @@ class StudentStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+    REVOKED = "revoked"          # was approved; access withdrawn by staff (restorable)
 
 
 class SessionState(str, enum.Enum):
@@ -307,6 +308,13 @@ class Camera(Base):
     # upgrade never starts streaming without an operator choosing it.
     auto_start: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("false"))
     offline_alerted_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    # Catalogue details and access: only members of the camera's workspace (and administrators)
+    # can see, preview or use it. A camera without a workspace is administrator-only.
+    code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, unique=True)  # "CAM-0001"
+    camera_type: Mapped[str] = mapped_column(String(16), default="rtsp", server_default=text("'rtsp'"))
+    description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    workspace_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class ClassSession(Base):
@@ -531,6 +539,8 @@ class Department(Base):
     code: Mapped[str] = mapped_column(String(16), unique=True, index=True)   # "CSE"
     name: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # Inactive: kept with its history, but not offered to new registrations or timetables.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
 
     programs: Mapped[list["Program"]] = relationship(back_populates="department")
 
@@ -566,9 +576,13 @@ class Section(Base):
     # A section is the class group: branch (via program) + year + batch + section name.
     batch_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("batches.id", ondelete="SET NULL"), nullable=True, index=True)
+    academic_year_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("academic_years.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
 
     program: Mapped[Program] = relationship(back_populates="sections")
     batch: Mapped[Optional["Batch"]] = relationship()
+    academic_year: Mapped[Optional["AcademicYear"]] = relationship()
 
     @property
     def label(self) -> str:
@@ -585,6 +599,22 @@ class Batch(Base):
     label: Mapped[str] = mapped_column(String(32), unique=True, index=True)     # "2023-2027"
     start_year: Mapped[int] = mapped_column(Integer)
     end_year: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+
+
+class AcademicYear(Base):
+    """A college year, e.g. "2026-27". Class groups (sections) belong to one, which is how the
+    approval list filters by academic year."""
+
+    __tablename__ = "academic_years"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    label: Mapped[str] = mapped_column(String(16), unique=True, index=True)      # "2026-27"
+    start_date: Mapped[Date] = mapped_column(Date)
+    end_date: Mapped[Date] = mapped_column(Date)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    is_current: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -913,6 +943,70 @@ class ProfileEditRequest(Base):
     decided_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     remark: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Workspace(Base):
+    """A group of cameras and tablets with the authorities allowed to use them: a building, a
+    department's rooms, an exam hall. Authorities see only the workspaces they belong to."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)      # "WS-0001"
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class WorkspaceMember(Base):
+    """An authority assigned to a workspace."""
+
+    __tablename__ = "workspace_members"
+    __table_args__ = (UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Tablet(Base):
+    """A device an authority registered for taking attendance (tablet photo, camera control).
+
+    Registration creates a one-time pairing code; entering it on the device stores a long-lived
+    device token there (httpOnly cookie). Only hashes of the code and token are kept here, so a
+    database leak does not let anyone impersonate a tablet. Disabling or revoking takes effect on
+    the device's next request.
+    """
+
+    __tablename__ = "tablets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)      # "TAB-0001"
+    name: Mapped[str] = mapped_column(String(80))
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)   # registering authority
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending|active|disabled|revoked
+    pairing_code_hash: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    pairing_expires_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    device_token_hash: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, unique=True)
+    device_info: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    paired_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class TabletCamera(Base):
+    """A camera a tablet may use (must be in the tablet's workspace)."""
+
+    __tablename__ = "tablet_cameras"
+    __table_args__ = (UniqueConstraint("tablet_id", "camera_id", name="uq_tablet_camera"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tablet_id: Mapped[int] = mapped_column(ForeignKey("tablets.id", ondelete="CASCADE"), index=True)
+    camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id", ondelete="CASCADE"), index=True)
 
 
 class StaffRegistration(Base):

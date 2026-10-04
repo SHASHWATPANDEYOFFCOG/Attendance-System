@@ -381,6 +381,50 @@ class ChangePasswordIn(BaseModel):
     new_password: str
 
 
+class AccountIn(BaseModel):
+    full_name: Optional[str] = Field(None, max_length=120)
+    phone: Optional[str] = Field(None, max_length=20)
+
+
+@router.patch("/me/account")
+def update_account(body: AccountIn, request: Request, db: Session = Depends(get_db),
+                   actor: User = Depends(current_user)):
+    """Your own name and mobile number. Email and role are changed by an administrator; a
+    student's class details go through an edit request."""
+    changes = {}
+    try:
+        if body.full_name is not None:
+            name = V.name(body.full_name)
+            if name != actor.display_name:
+                changes["full_name"] = (actor.display_name, name)
+                actor.display_name = name
+        if body.phone is not None:
+            phone = V.phone(body.phone, required=False)
+            if phone != actor.phone:
+                if phone:
+                    check_unique(db, phone=phone, exclude_user=actor.id)
+                changes["phone"] = (actor.phone, phone)
+                actor.phone = phone
+    except V.Invalid as exc:
+        raise _invalid(exc)
+    if changes:
+        audit(db, actor, "account_updated", target_type="user", target_id=actor.id,
+              detail={k: {"from": a, "to": b} for k, (a, b) in changes.items()}, request=request)
+        db.commit()
+    return {"full_name": actor.display_name, "phone": actor.phone, "email": actor.email,
+            "changed": sorted(changes)}
+
+
+@router.post("/me/sessions/revoke-all")
+def sign_out_everywhere(request: Request, db: Session = Depends(get_db),
+                        actor: User = Depends(current_user)):
+    """End every session of this account on every device, including this one."""
+    actor.password_changed_at = utcnow()
+    audit(db, actor, "signed_out_everywhere", target_type="user", target_id=actor.id, request=request)
+    db.commit()
+    return {"signed_out": True}
+
+
 @router.post("/me/password")
 def change_password(body: ChangePasswordIn, request: Request, db: Session = Depends(get_db),
                     actor: User = Depends(current_user)):

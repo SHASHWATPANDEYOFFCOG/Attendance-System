@@ -100,12 +100,15 @@ def test_student_dashboard_carries_no_camera_data(api, make_user):
     assert "review_queue" not in body
 
 
-def test_only_admin_creates_cameras(api, make_user):
+def test_only_an_administrator_adds_cameras(api, make_user):
     _f, faculty = make_user("prof", role="faculty")
-    _a, admin = make_user("root", role="admin")
+    _h, hod = make_user("hod", role="admin")
+    _a, admin = make_user("root", role="super_admin")
     payload = {"name": "door-1", "room": "R1", "source": "0", "mode": "kiosk"}
     assert api.post("/api/cameras", json=payload, headers=faculty).status_code == 403
-    assert api.post("/api/cameras", json=payload, headers=admin).status_code == 201
+    assert api.post("/api/cameras", json=payload, headers=hod).status_code == 403
+    r = api.post("/api/cameras", json=payload, headers=admin)
+    assert r.status_code == 201 and r.json()["code"] == "CAM-0001"
 
 
 # ---------------------------------------------------------- faculty scoping

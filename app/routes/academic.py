@@ -34,6 +34,7 @@ from app.auth import (
 )
 from app.db import get_db
 from app.models import (
+    AcademicYear,
     AcademicTerm,
     Batch,
     Camera,
@@ -103,6 +104,9 @@ def _section_out(sec: Section, students: int = 0) -> dict:
         "department_id": sec.program.department_id if sec.program else None,
         "department_code": sec.program.department.code if sec.program else None,
         "batch_id": sec.batch_id, "batch": sec.batch.label if sec.batch else None,
+        "academic_year_id": sec.academic_year_id,
+        "academic_year": sec.academic_year.label if sec.academic_year else None,
+        "is_active": sec.is_active,
         "label": section_label(sec), "students": students,
     }
 
@@ -120,6 +124,7 @@ def _student_counts(db: Session) -> dict:
 class DepartmentIn(BaseModel):
     code: str = Field(min_length=1, max_length=16)
     name: str = Field(min_length=1, max_length=120)
+    is_active: Optional[bool] = None
 
     @field_validator("code")
     @classmethod
@@ -134,7 +139,8 @@ class DepartmentIn(BaseModel):
 def list_departments(db: Session = Depends(get_db), _: User = Depends(current_user)):
     counts = dict(db.execute(select(StudentProfile.department_id, func.count())
                              .group_by(StudentProfile.department_id)).all())
-    return [{"id": d.id, "code": d.code, "name": d.name, "students": counts.get(d.id, 0)}
+    return [{"id": d.id, "code": d.code, "name": d.name, "students": counts.get(d.id, 0),
+             "is_active": d.is_active}
             for d in db.scalars(select(Department).order_by(Department.code))]
 
 
@@ -159,12 +165,15 @@ def update_department(dept_id: int, body: DepartmentIn, request: Request,
     if d is None:
         raise HTTPException(404, "branch not found")
     _dept_guard(actor, d.id)
-    before = {"code": d.code, "name": d.name}
+    before = {"code": d.code, "name": d.name, "is_active": d.is_active}
     d.code, d.name = body.code, body.name.strip()
+    if body.is_active is not None:
+        d.is_active = body.is_active
     audit(db, actor, "branch_updated", target_type="department", target_id=d.id,
-          detail={"before": before, "after": {"code": d.code, "name": d.name}}, request=request)
+          detail={"before": before, "after": {"code": d.code, "name": d.name, "is_active": d.is_active}},
+          request=request)
     _commit(db, f"a branch with code {body.code} already exists")
-    return {"id": d.id, "code": d.code, "name": d.name}
+    return {"id": d.id, "code": d.code, "name": d.name, "is_active": d.is_active}
 
 
 @router.delete("/departments/{dept_id}")
@@ -270,6 +279,7 @@ class BatchIn(BaseModel):
     start_year: int = Field(ge=1990, le=2100)
     end_year: int = Field(ge=1990, le=2110)
     label: Optional[str] = Field(None, max_length=32)
+    is_active: Optional[bool] = None
 
 
 @router.get("/batches")
@@ -277,7 +287,7 @@ def list_batches(db: Session = Depends(get_db), _: User = Depends(current_user))
     counts = dict(db.execute(select(StudentProfile.batch_id, func.count())
                              .group_by(StudentProfile.batch_id)).all())
     return [{"id": b.id, "label": b.label, "start_year": b.start_year, "end_year": b.end_year,
-             "students": counts.get(b.id, 0)}
+             "students": counts.get(b.id, 0), "is_active": b.is_active}
             for b in db.scalars(select(Batch).order_by(Batch.start_year.desc()))]
 
 
@@ -305,6 +315,8 @@ def update_batch(batch_id: int, body: BatchIn, request: Request, db: Session = D
     if b is None:
         raise HTTPException(404, "batch not found")
     b.label, b.start_year, b.end_year = _batch_label(body), body.start_year, body.end_year
+    if body.is_active is not None:
+        b.is_active = body.is_active
     audit(db, actor, "batch_updated", target_type="batch", target_id=b.id, request=request)
     _commit(db, f"batch {b.label} already exists")
     return {"id": b.id, "label": b.label, "start_year": b.start_year, "end_year": b.end_year}
@@ -340,6 +352,8 @@ class SectionIn(BaseModel):
     name: str = Field(min_length=1, max_length=32)
     year: int = Field(ge=1, le=6)
     semester: int = Field(ge=1, le=12)
+    academic_year_id: Optional[int] = None
+    is_active: Optional[bool] = None
 
 
 def _resolve_program(db: Session, body: SectionIn) -> Program:
@@ -366,6 +380,7 @@ def _resolve_program(db: Session, body: SectionIn) -> Program:
 @router.get("/sections")
 def list_sections(department_id: Optional[int] = None, batch_id: Optional[int] = None,
                   year: Optional[int] = None, mine: bool = False,
+                  academic_year_id: Optional[int] = None,
                   db: Session = Depends(get_db), actor: User = Depends(current_user)):
     stmt = select(Section).join(Program, Program.id == Section.program_id)
     if department_id:
@@ -374,6 +389,8 @@ def list_sections(department_id: Optional[int] = None, batch_id: Optional[int] =
         stmt = stmt.where(Section.batch_id == batch_id)
     if year:
         stmt = stmt.where(Section.year == year)
+    if academic_year_id:
+        stmt = stmt.where(Section.academic_year_id == academic_year_id)
     if mine:
         allowed = manageable_section_ids(db, actor)
         if allowed is not None:
@@ -391,8 +408,12 @@ def create_section(body: SectionIn, request: Request, db: Session = Depends(get_
     _dept_guard(actor, p.department_id)
     if body.batch_id and db.get(Batch, body.batch_id) is None:
         raise HTTPException(404, "batch not found")
+    if body.academic_year_id and db.get(AcademicYear, body.academic_year_id) is None:
+        raise HTTPException(404, "academic year not found")
     s = Section(program_id=p.id, name=body.name.strip().upper(), year=body.year,
-                semester=body.semester, batch_id=body.batch_id)
+                semester=body.semester, batch_id=body.batch_id,
+                academic_year_id=body.academic_year_id,
+                is_active=True if body.is_active is None else body.is_active)
     db.add(s)
     _flush(db, "that section already exists for this year and semester")
     audit(db, actor, "section_created", target_type="section", target_id=s.id, request=request)
@@ -410,8 +431,13 @@ def update_section(section_id: int, body: SectionIn, request: Request,
     _dept_guard(actor, s.program.department_id)
     p = _resolve_program(db, body)
     _dept_guard(actor, p.department_id)
+    if body.academic_year_id and db.get(AcademicYear, body.academic_year_id) is None:
+        raise HTTPException(404, "academic year not found")
     s.program_id, s.name, s.year, s.semester, s.batch_id = (
         p.id, body.name.strip().upper(), body.year, body.semester, body.batch_id)
+    s.academic_year_id = body.academic_year_id
+    if body.is_active is not None:
+        s.is_active = body.is_active
     # Keep the students' denormalised class fields in step with the section.
     for prof in db.scalars(select(StudentProfile).where(StudentProfile.section_id == s.id)):
         prof.year, prof.batch_id, prof.department_id = s.year, s.batch_id, p.department_id
@@ -1018,6 +1044,84 @@ def delete_slot(slot_id: int, request: Request, db: Session = Depends(get_db),
     return {"deleted": slot_id}
 
 
+# ------------------------------------------------------------ academic years
+
+class AcademicYearIn(BaseModel):
+    label: str = Field(min_length=4, max_length=16)
+    start_date: date
+    end_date: date
+    is_active: bool = True
+    is_current: bool = False
+
+
+def _ay_out(db: Session, y: AcademicYear) -> dict:
+    n = db.scalar(select(func.count()).select_from(Section).where(Section.academic_year_id == y.id)) or 0
+    return {"id": y.id, "label": y.label, "start_date": y.start_date.isoformat(),
+            "end_date": y.end_date.isoformat(), "is_active": y.is_active,
+            "is_current": y.is_current, "sections": n}
+
+
+def _ay_apply(db: Session, y: AcademicYear, body: AcademicYearIn) -> None:
+    if body.end_date <= body.start_date:
+        raise HTTPException(422, detail={"field": "end_date", "message": "The year must end after it starts."})
+    y.label = body.label.strip().replace("\u2013", "-")
+    y.start_date, y.end_date, y.is_active = body.start_date, body.end_date, body.is_active
+    if body.is_current:
+        for other in db.scalars(select(AcademicYear).where(AcademicYear.is_current.is_(True))):
+            other.is_current = False
+        y.is_current = True
+    elif y.is_current and not body.is_current:
+        y.is_current = False
+
+
+@router.get("/academic-years")
+def list_academic_years(db: Session = Depends(get_db), _: User = Depends(current_user)):
+    return [_ay_out(db, y) for y in db.scalars(select(AcademicYear).order_by(AcademicYear.start_date.desc()))]
+
+
+@router.post("/academic-years", status_code=201)
+def create_academic_year(body: AcademicYearIn, request: Request, db: Session = Depends(get_db),
+                         actor: User = Depends(require_super_admin)):
+    y = AcademicYear(label="", start_date=body.start_date, end_date=body.end_date)
+    _ay_apply(db, y, body)
+    db.add(y)
+    _flush(db, f"academic year {y.label} already exists")
+    audit(db, actor, "academic_year_created", target_type="academic_year", target_id=y.id,
+          detail={"label": y.label}, request=request)
+    _commit(db, f"academic year {y.label} already exists")
+    return _ay_out(db, y)
+
+
+@router.patch("/academic-years/{year_id}")
+def update_academic_year(year_id: int, body: AcademicYearIn, request: Request,
+                         db: Session = Depends(get_db), actor: User = Depends(require_super_admin)):
+    y = db.get(AcademicYear, year_id)
+    if y is None:
+        raise HTTPException(404, "academic year not found")
+    _ay_apply(db, y, body)
+    audit(db, actor, "academic_year_updated", target_type="academic_year", target_id=y.id,
+          detail=body.model_dump(mode="json"), request=request)
+    _commit(db, f"academic year {y.label} already exists")
+    return _ay_out(db, y)
+
+
+@router.delete("/academic-years/{year_id}")
+def delete_academic_year(year_id: int, request: Request, db: Session = Depends(get_db),
+                         actor: User = Depends(require_super_admin)):
+    y = db.get(AcademicYear, year_id)
+    if y is None:
+        raise HTTPException(404, "academic year not found")
+    _refuse_if(db.scalar(select(func.count()).select_from(Section).where(Section.academic_year_id == y.id)) or 0,
+               f"Academic year {y.label} still has {{n}} section(s). Move them to another year or "
+               f"deactivate it instead.")
+    label = y.label
+    db.delete(y)
+    audit(db, actor, "academic_year_deleted", target_type="academic_year", target_id=year_id,
+          detail={"label": label}, request=request)
+    db.commit()
+    return {"deleted": year_id}
+
+
 # ---------------------------------------------------------------- public
 
 @router.get("/public/academic-options")
@@ -1025,7 +1129,13 @@ def academic_options(db: Session = Depends(get_db)):
     """What the sign-up form's dropdowns offer. Public, and deliberately minimal: names of
     branches, batches and sections, never people."""
     sections = []
-    for s in db.scalars(select(Section)):
+    for s in db.scalars(select(Section).where(Section.is_active.is_(True))):
+        if s.academic_year is not None and not s.academic_year.is_active:
+            continue
+        if s.program and s.program.department and not s.program.department.is_active:
+            continue
+        if s.batch is not None and not s.batch.is_active:
+            continue
         dept_id = s.program.department_id if s.program else None
         sections.append({"id": s.id, "name": s.name, "year": s.year, "semester": s.semester,
                          "department_id": dept_id, "batch_id": s.batch_id,
@@ -1048,9 +1158,11 @@ def academic_options(db: Session = Depends(get_db)):
                    "email_verification_required": s_all["email_verification_required"]},
         "departments": [{"id": d.id, "code": d.code, "name": d.name,
                          "years": int(max_years.get(d.id) or 4)}
-                        for d in db.scalars(select(Department).order_by(Department.code))],
+                        for d in db.scalars(select(Department).where(Department.is_active.is_(True))
+                                            .order_by(Department.code))],
         "batches": [{"id": b.id, "label": b.label}
-                    for b in db.scalars(select(Batch).order_by(Batch.start_year.desc()))],
+                    for b in db.scalars(select(Batch).where(Batch.is_active.is_(True))
+                                        .order_by(Batch.start_year.desc()))],
         "sections": sections,
     }
 

@@ -21,7 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit import audit
-from app.auth import assert_owns_session, require_admin, require_staff
+from app.auth import assert_owns_session, require_admin, require_staff, require_super_admin
 from app.cctv import (
     delete_review_crop,
     grab_frame,
@@ -59,6 +59,11 @@ class CameraUpdateIn(BaseModel):
     enabled: Optional[bool] = None
     auto_start: Optional[bool] = None
     mode: Optional[str] = None
+    code: Optional[str] = Field(None, max_length=32)
+    camera_type: Optional[str] = Field(None, max_length=16)
+    description: Optional[str] = Field(None, max_length=300)
+    workspace_id: Optional[int] = None
+    clear_workspace: bool = False
 
 
 def _cam(db: Session, camera_id: int) -> Camera:
@@ -70,7 +75,7 @@ def _cam(db: Session, camera_id: int) -> Camera:
 
 @router.patch("/cameras/{camera_id}")
 def update_camera(camera_id: int, body: CameraUpdateIn, request: Request,
-                  db: Session = Depends(get_db), actor: User = Depends(require_admin)):
+                  db: Session = Depends(get_db), actor: User = Depends(require_super_admin)):
     from app.api import _camera_out
 
     c = _cam(db, camera_id)
@@ -80,6 +85,26 @@ def update_camera(camera_id: int, body: CameraUpdateIn, request: Request,
     for k in ("name", "room", "source", "enabled", "auto_start", "mode"):
         if k in changes and changes[k] is not None:
             setattr(c, k, changes[k].strip() if isinstance(changes[k], str) else changes[k])
+    if body.code is not None:
+        from app.routes.administration import _clean_code
+
+        c.code = _clean_code(body.code, "code") or c.code
+    if body.camera_type is not None:
+        from app.api import CAMERA_TYPES
+
+        if body.camera_type not in CAMERA_TYPES:
+            raise HTTPException(422, detail={"field": "camera_type", "message": "Choose a camera type from the list."})
+        c.camera_type = body.camera_type
+    if "description" in changes:
+        c.description = (body.description or "").strip() or None
+    if body.clear_workspace:
+        c.workspace_id = None
+    elif body.workspace_id is not None:
+        from app.models import Workspace
+
+        if db.get(Workspace, body.workspace_id) is None:
+            raise HTTPException(422, detail={"field": "workspace_id", "message": "That workspace does not exist."})
+        c.workspace_id = body.workspace_id
     if body.clear_credentials:
         c.username_encrypted = c.password_encrypted = None
     if body.username:
@@ -102,7 +127,7 @@ def update_camera(camera_id: int, body: CameraUpdateIn, request: Request,
 
 @router.delete("/cameras/{camera_id}")
 def delete_camera(camera_id: int, request: Request, db: Session = Depends(get_db),
-                  actor: User = Depends(require_admin)):
+                  actor: User = Depends(require_super_admin)):
     from app.worker import registry
 
     c = _cam(db, camera_id)
@@ -110,7 +135,7 @@ def delete_camera(camera_id: int, request: Request, db: Session = Depends(get_db
     for s in db.scalars(select(ClassSession).where(ClassSession.camera_id == camera_id)):
         s.camera_id = None
     db.delete(c)
-    audit(db, actor, "camera_deleted", target_type="camera", target_id=camera_id,
+    audit(db, actor, "camera_removed", target_type="camera", target_id=camera_id,
           detail={"name": c.name}, request=request)
     db.commit()
     return {"deleted": camera_id}
@@ -118,9 +143,13 @@ def delete_camera(camera_id: int, request: Request, db: Session = Depends(get_db
 
 @router.post("/cameras/{camera_id}/test")
 def test_camera(camera_id: int, request: Request, db: Session = Depends(get_db),
-                actor: User = Depends(require_admin)):
+                actor: User = Depends(require_staff)):
     """Open the stream and return one frame. The image is never stored."""
+    from app.resources import camera_visible
+
     c = _cam(db, camera_id)
+    if not camera_visible(db, actor, c):
+        raise HTTPException(404, "camera not found")
     t0 = time.perf_counter()
     frame, error = grab_frame(stream_url(c))
     took = round((time.perf_counter() - t0) * 1000)

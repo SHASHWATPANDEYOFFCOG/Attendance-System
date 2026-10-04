@@ -94,6 +94,13 @@ SPECS: Dict[str, Spec] = {
     "selfmark_retry_limit": Spec("int", _const(3), "Failed attempts allowed per lecture", min=1,
                                  max=20, group="mobile"),
 
+    # ---- devices -------------------------------------------------------------------------
+    "tablet_required": Spec(
+        "bool", _const(True), "Tablet photo and camera control only from registered tablets",
+        "On: an authority can take a class photo or connect a camera only from a tablet paired to "
+        "one of their workspaces (Tablets page), and only with that tablet's cameras. "
+        "Administrators are exempt.", group="devices"),
+
     # ---- face ------------------------------------------------------------------------------
     "face_match_threshold": Spec("float", _cfg("gallery.match_threshold", 0.45),
                                  "Face match threshold (cosine)",

@@ -187,8 +187,10 @@ export default function SignupPage() {
     for (const [k, v] of Object.entries(form)) if (k !== "confirm" && v !== "") fd.append(k, v.trim());
     fd.append("photo", photo as File);
     try {
-      await publicApi.upload("auth/signup", fd);
-      router.push(`/verify-email?email=${encodeURIComponent(form.email.trim().toLowerCase())}`);
+      const res = await publicApi.upload<{ otp_sent?: boolean }>("auth/signup", fd);
+      router.push(res?.otp_sent
+        ? `/verify-email?email=${encodeURIComponent(form.email.trim().toLowerCase())}`
+        : "/login?registered=student");
     } catch (e) {
       const detail = e instanceof ApiFailure ? e.detail : undefined;
       const field = typeof detail?.field === "string" ? detail.field : undefined;

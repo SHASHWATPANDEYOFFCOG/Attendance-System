@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 
 import { ADMIN } from "./config.mjs";
-import { adminApi, approvedStudent, latestMail, makeClass, signIn, uid } from "./helpers";
+import { adminApi, approvedStudent, makeClass, signIn, uid } from "./helpers";
 
 test("staff sign in at the authority door and land on the authority dashboard", async ({ page }) => {
   await signIn(page, ADMIN.username, ADMIN.password, "authority");
@@ -46,7 +46,7 @@ test("a signed-out visit to a staff page goes to the authority sign in", async (
   await expect(page).toHaveURL(/\/login\?next=%2Fstudent%2Fleaves/);
 });
 
-test("by default a registered teacher signs in as soon as the email is verified", async ({ page }) => {
+test("by default a registered teacher signs in straight away", async ({ page }) => {
   const tag = uid();
   const admin = await adminApi();
   const cls = await makeClass(admin, tag);
@@ -54,7 +54,7 @@ test("by default a registered teacher signs in as soon as the email is verified"
 
   await page.goto("/authority/register");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByText(/your account is ready straight away/)).toBeVisible();
+  await expect(page.getByText(/Your account is ready as soon as you register/)).toBeVisible();
   await page.getByLabel(/^Full name/).fill(`Quick ${tag}`);
   await page.getByLabel(/^Email/).fill(email);
   await page.getByLabel(/^Mobile number/).fill(`6${String(parseInt(tag, 36)).padStart(9, "0").slice(-9)}`);
@@ -64,11 +64,8 @@ test("by default a registered teacher signs in as soon as the email is verified"
   await page.getByLabel(/^Confirm password/).fill("Teach-Pass-123");
   await page.getByRole("button", { name: "Register" }).click();
 
-  await page.waitForURL(/\/verify-email/);
-  const code = /\b(\d{6})\b/.exec(await latestMail(email, "verification code"))![1];
-  await page.getByLabel("Verification code").fill(code);
-  await page.getByRole("button", { name: "Verify" }).click();
-  await expect(page.getByText(/Your account is ready/)).toBeVisible();
+  await page.waitForURL(/\/authority\/login\?registered=staff/);
+  await expect(page.getByRole("status")).toContainText("your account is ready");
 
   await signIn(page, email, "Teach-Pass-123", "authority");
   await expect(page.getByRole("heading", { name: "Authority dashboard" })).toBeVisible();
@@ -96,13 +93,8 @@ test("with approval switched on, a registered teacher waits until an admin appro
   await page.getByLabel(/^Confirm password/).fill("Teach-Pass-123");
   await page.getByRole("button", { name: "Register" }).click();
 
-  await page.waitForURL(/\/verify-email/);
-  const code = /\b(\d{6})\b/.exec(await latestMail(email, "verification code"))![1];
-  await page.getByLabel("Verification code").fill(code);
-  await page.getByRole("button", { name: "Verify" }).click();
-  await expect(page.getByText(/administrator will review your request/)).toBeVisible();
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/authority\/login/);
+  await page.waitForURL(/\/authority\/login\?registered=staff-pending/);
+  await expect(page.getByRole("status")).toContainText("An administrator will approve");
 
   // Not yet: the account exists but grants nothing.
   await page.waitForLoadState("networkidle");

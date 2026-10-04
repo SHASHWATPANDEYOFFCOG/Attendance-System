@@ -11,7 +11,7 @@ import { adminApi, latestMail, makeClass, signIn, uid } from "./helpers";
 
 const PHOTO = path.join(__dirname, "fixtures", "photo.jpg");
 
-test("a student registers, verifies email, is approved and reaches the dashboard", async ({ page, browser }) => {
+test("a student registers, is approved and reaches the dashboard", async ({ page, browser }) => {
   const tag = uid();
   const admin = await adminApi();
   const cls = await makeClass(admin, tag);
@@ -47,12 +47,9 @@ test("a student registers, verifies email, is approved and reaches the dashboard
   await page.locator('input[type="file"]').setInputFiles(PHOTO);
   await page.getByRole("button", { name: "Register" }).click();
 
-  // ---- verify email with the code from the (test) outbox
-  await page.waitForURL(/\/verify-email/);
-  const code = /\b(\d{6})\b/.exec(await latestMail(email, "verification code"))![1];
-  await page.getByLabel("Verification code").fill(code);
-  await page.getByRole("button", { name: "Verify" }).click();
-  await expect(page.getByRole("heading", { name: "Email verified" })).toBeVisible();
+  // ---- no email code by default: straight to the sign-in page
+  await page.waitForURL(/\/login\?registered=student/);
+  await expect(page.getByRole("status")).toContainText("You are registered");
 
   // ---- signed in but waiting
   await signIn(page, email, password);

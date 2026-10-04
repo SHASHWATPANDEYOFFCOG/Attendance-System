@@ -22,6 +22,12 @@ const COPY: Record<Portal, { subtitle: string; heading: string; user: string }> 
                user: "Username or email" },
 };
 
+const REGISTERED: Record<string, string> = {
+  student: "You are registered. Sign in below. A teacher of your class will approve your account before you can mark attendance.",
+  staff: "You are registered and your account is ready. Sign in below.",
+  "staff-pending": "You are registered. An administrator will approve your account; you will be able to sign in after that.",
+};
+
 export function SignIn({ portal }: { portal: Portal }) {
   return (
     <Suspense fallback={<LoginShell portal={portal} />}>
@@ -36,6 +42,7 @@ function LoginForm({ portal }: { portal: Portal }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<{ text: string; switchTo?: string } | null>(null);
+  const registered = REGISTERED[params.get("registered") ?? ""];
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -76,6 +83,15 @@ function LoginForm({ portal }: { portal: Portal }) {
           onSubmit={submit}
           className="bg-card border border-rule rounded-[3px] p-6 shadow-lift"
         >
+          {registered && !error ? (
+            <div
+              role="status"
+              className="mb-3 rounded-r-[2px] border-l-4 px-3 py-2 text-[13.5px]"
+              style={{ borderLeftColor: "var(--verdant)", background: "color-mix(in srgb, var(--verdant) 11%, transparent)" }}
+            >
+              {registered}
+            </div>
+          ) : null}
           {error ? (
             <div
               role="alert"

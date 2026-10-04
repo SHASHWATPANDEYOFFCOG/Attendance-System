@@ -17,7 +17,7 @@ import { Banner } from "@/components/ui";
 
 type Options = {
   departments: { id: number; code: string; name: string }[];
-  policy?: { staff_registration_approval?: boolean };
+  policy?: { staff_registration_approval?: boolean; email_verification_required?: boolean };
 };
 
 type Form = {
@@ -75,13 +75,15 @@ export default function AuthorityRegisterPage() {
     setBusy(true);
     setFormError(null);
     try {
-      await publicApi.post("auth/staff-signup", {
+      const res = await publicApi.post<{ otp_sent?: boolean; account?: string }>("auth/staff-signup", {
         full_name: form.full_name.trim(), email: form.email.trim(), mobile: form.mobile.trim(),
         employee_id: form.employee_id.trim(), designation: form.designation.trim() || null,
         department_id: Number(form.department_id), requested_role: form.requested_role,
         password: form.password,
       });
-      router.push(`/verify-email?email=${encodeURIComponent(form.email.trim().toLowerCase())}`);
+      router.push(res?.otp_sent
+        ? `/verify-email?email=${encodeURIComponent(form.email.trim().toLowerCase())}`
+        : `/authority/login?registered=${res?.account === "pending" ? "staff-pending" : "staff"}`);
     } catch (err) {
       const detail = err instanceof ApiFailure ? err.detail : undefined;
       const field = typeof detail?.field === "string" ? detail.field : undefined;
@@ -97,9 +99,12 @@ export default function AuthorityRegisterPage() {
     <PublicShell width={560} subtitle="Authority portal · staff registration">
       <AuthCard title="Register as staff">
         <Banner>
-          {opts?.policy?.staff_registration_approval
-            ? "We email you a code to confirm your address. Your account then works once an administrator approves it (an HOD can approve teachers of their own branch)."
-            : "We email you a code to confirm your address, and your account is ready straight away. HOD rights are given by the administrator."}
+          {[
+            opts?.policy?.email_verification_required ? "We email you a code to confirm your address." : null,
+            opts?.policy?.staff_registration_approval
+              ? "Your account works once an administrator approves it (an HOD can approve teachers of their own branch)."
+              : "Your account is ready as soon as you register. HOD rights are given by the administrator.",
+          ].filter(Boolean).join(" ")}
         </Banner>
         {optsError ? <FormError>{optsError}</FormError> : null}
         {opts && opts.departments.length === 0 ? (

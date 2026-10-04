@@ -44,7 +44,7 @@ export default async function GuidePage() {
           <ol className="m-0 grid list-none gap-3.5 p-0">
             <Step n={1} title="Register">
               Open <Link href="/signup" className="underline">Register</Link>, fill in your details exactly as in college
-              records, choose your branch, year, batch and section, and add a profile photo. Enter the 6-digit code we email you.
+              records, choose your branch, year, batch and section, and add a profile photo, then sign in.
             </Step>
             <Step n={2} title="Wait for approval">
               Your class teacher checks and approves your account. You can sign in meanwhile, but cannot mark attendance until

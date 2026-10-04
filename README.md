@@ -40,7 +40,8 @@ python -m uvicorn app.api:app --host 127.0.0.1 --port 8079   # terminal 1 (same 
 
 cd web-next; npm ci; npm run build
 $env:ATTENDANCE_INSECURE_COOKIES = "1"; npx next start -p 3001   # terminal 2
-# open http://localhost:3001  — admin / teacher.cse / 23cse001, password Demo-Pass-123
+# students:  http://localhost:3001/login            (23cse001 … 24me030)
+# staff:     http://localhost:3001/authority/login  (admin, hod.cse, teacher.cse) — password Demo-Pass-123
 ```
 
 **Deploy for real:** [docs/DEPLOY.md](docs/DEPLOY.md) — environment variables

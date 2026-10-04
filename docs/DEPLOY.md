@@ -69,7 +69,7 @@ camera password must be re-entered. Changing `ATTENDANCE_JWT_SECRET` signs every
 python tools\seed.py --admin principal --password "<a strong password>"
 ```
 
-Sign in at `https://<your address>/login`, then in order:
+Sign in at `https://<your address>/authority/login` (staff; students use `/login`), then in order:
 
 1. **Settings** — college name, minimum attendance %, present/late windows, campus location.
 2. **Academic setup** — branches, batches, class groups (sections), subjects, rooms, term,

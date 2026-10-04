@@ -42,6 +42,8 @@ The portal can be installed like an app: browser menu → **Add to Home screen**
 
 ## Teachers
 
+Sign in at **/authority/login** (students use **/login**). You land on the authority dashboard.
+
 1. **Your classes.** The admin or HOD assigns your subjects and classes and builds the
    timetable. Everywhere — directory, reports, leave, issues — you see only students of your
    classes.
